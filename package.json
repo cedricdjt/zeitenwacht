@@ -1,0 +1,21 @@
+{
+  "name": "zeitenwacht",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tower Defense durch die Zeitalter. Läuft ohne Build-Schritt im Browser (three.js, ES-Module).",
+  "scripts": {
+    "start": "python3 tools/serve.py",
+    "check": "tsc -p jsconfig.json",
+    "test": "node --test tests/",
+    "build": "node tools/build-standalone.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/three": "0.187.0",
+    "esbuild": "0.28.2",
+    "puppeteer-core": "25.16.0",
+    "three": "0.187.0",
+    "typescript": "7.0.2"
+  }
+}

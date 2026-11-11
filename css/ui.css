@@ -1,0 +1,5358 @@
+/* Aussehen der Bedienoberfläche: dunkles, durchscheinendes Glas über der 3D-Ansicht, eine Akzentfarbe je Zeitalter.
+   Alle Maße hängen an der Schriftgröße der Wurzel (.zw-root), die mit dem Fenster wächst. */
+
+@property --accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #e2603a;
+}
+@property --accent-text {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #f0a48c;
+}
+
+.zw-root {
+  --accent: #e2603a;
+  --on-accent: #fffdf8;
+  --accent-text: #f0a48c;
+  --glass: rgba(18, 22, 30, 0.72);
+  --glass-solid: rgba(22, 27, 37, 0.94);
+  --raise: rgba(255, 255, 255, 0.075);
+  --raise-2: rgba(255, 255, 255, 0.14);
+  --sink: rgba(4, 7, 12, 0.3);
+  --line: rgba(255, 255, 255, 0.15);
+  --text: #f5f1e9;
+  --muted: #c9ced8;
+  --gold: #f6cb5c;
+  --ember: #ffb066;
+  --good: #96e6a8;
+  --warn: #ffb9a3;
+  --r: 1.1em;
+  --r-s: 0.7em;
+  --shadow: 0 0.5em 1.6em rgba(6, 9, 16, 0.3), 0 0.1em 0.3em rgba(6, 9, 16, 0.25);
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", "P052", Georgia, serif;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --pad-l: max(0.8em, env(safe-area-inset-left));
+  --pad-r: max(0.8em, env(safe-area-inset-right));
+  --pad-t: max(0.8em, env(safe-area-inset-top));
+  --pad-b: max(0.8em, env(safe-area-inset-bottom));
+  font-size: clamp(12.5px, calc(0.3vw + 0.5vh + 6.2px), 34px);
+  line-height: 1.35;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  transition: --accent 1.4s ease, --accent-text 1.4s ease;
+  hyphens: auto;
+}
+
+.zw-root [hidden] {
+  display: none !important;
+}
+
+:where(.zw-root) button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.zw-root button:focus-visible,
+.zw-root input:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.zw-root h1,
+.zw-root h2,
+.zw-root h3,
+.zw-root p,
+.zw-root ul,
+.zw-root ol,
+.zw-root dl,
+.zw-root dd {
+  margin: 0;
+  padding: 0;
+}
+
+.zw-root ul,
+.zw-root ol {
+  list-style: none;
+}
+
+/* ---------- Bausteine ---------- */
+
+.zw-glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15) brightness(0.8);
+  backdrop-filter: blur(10px) saturate(1.15) brightness(0.8);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+
+.zw-lowfx .zw-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(22, 27, 37, 0.9);
+}
+
+.zw-ic {
+  display: inline-flex;
+  flex: none;
+}
+
+.zw-icon {
+  display: block;
+  width: 1.25em;
+  height: 1.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.zw-icon .f {
+  fill: currentColor;
+  stroke: none;
+}
+
+.zw-kbd {
+  flex: none;
+  min-width: 1.7em;
+  padding: 0.28em 0.42em;
+  border-radius: 0.4em;
+  border: 1px solid currentColor;
+  font: 600 0.66em/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  text-align: center;
+  opacity: 0.62;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .zw-kbd {
+    display: none;
+  }
+}
+
+.zw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  min-height: 2.7em;
+  padding: 0.5em 1em;
+  border-radius: var(--r-s);
+  background: var(--raise) !important;
+  border: 1px solid var(--line) !important;
+  font-weight: 600 !important;
+  transition: background 0.16s var(--ease), transform 0.16s var(--ease), filter 0.16s var(--ease), opacity 0.16s;
+}
+
+.zw-btn:hover {
+  background: var(--raise-2) !important;
+}
+
+.zw-btn:active {
+  transform: translateY(1px);
+}
+
+.zw-btn.zw-primary {
+  background: var(--accent) !important;
+  border-color: transparent !important;
+  color: var(--on-accent);
+  box-shadow: 0 0.2em 0.7em rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.zw-btn.zw-primary:hover {
+  filter: brightness(1.08);
+}
+
+.zw-btn.zw-disabled,
+.zw-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  filter: saturate(0.5);
+}
+
+.zw-btn.zw-disabled:active,
+.zw-btn:disabled:active {
+  transform: none;
+}
+
+.zw-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 2.5em;
+  height: 2.5em;
+  border-radius: var(--r-s);
+  transition: background 0.16s var(--ease);
+}
+
+.zw-iconbtn:hover {
+  background: var(--raise-2);
+}
+
+.zw-seg {
+  display: flex;
+  gap: 0.15em;
+  padding: 0.2em;
+  border-radius: var(--r-s);
+  background: var(--sink);
+}
+
+.zw-seg-btn {
+  display: grid;
+  place-items: center;
+  min-width: 2.5em;
+  min-height: 2.2em;
+  padding: 0.2em 0.6em;
+  border-radius: 0.5em;
+  font-weight: 650;
+  color: var(--muted);
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.zw-root .zw-seg-btn:hover {
+  background: var(--raise);
+  color: var(--text);
+}
+
+.zw-root .zw-seg-btn.zw-on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.zw-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.zw-price .zw-icon {
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--gold);
+}
+
+.zw-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 1.8em;
+  color: var(--muted);
+  font-size: 0.86em;
+  font-weight: 600;
+}
+
+.zw-switch-box {
+  position: relative;
+  flex: none;
+  width: 2.5em;
+  height: 1.4em;
+  border-radius: 1em;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.18s var(--ease);
+}
+
+.zw-switch-box::after {
+  content: "";
+  position: absolute;
+  top: 0.17em;
+  left: 0.18em;
+  width: 1.06em;
+  height: 1.06em;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.18s var(--ease);
+}
+
+.zw-switch.zw-on {
+  color: var(--text);
+}
+
+.zw-switch.zw-on .zw-switch-box {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.zw-switch.zw-on .zw-switch-box::after {
+  transform: translateX(1.08em);
+}
+
+.zw-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.82em;
+  font-weight: 650;
+  color: var(--role-text, var(--text));
+  white-space: nowrap;
+}
+
+.zw-role .zw-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.zw-emblem {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.3em;
+  height: 2.3em;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0.15em 0.5em rgba(0, 0, 0, 0.25);
+}
+
+.zw-emblem .zw-icon {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+.zw-trait {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+.zw-trait-boss { color: var(--gold); }
+.zw-trait-flying { color: #a9d4ff; }
+.zw-trait-armored { color: #d3d8e2; }
+.zw-trait-shield { color: #7fe3da; }
+.zw-trait-healer,
+.zw-trait-regen { color: var(--good); }
+.zw-trait-quick { color: #ffd98a; }
+.zw-trait-swarm { color: #ffc2a0; }
+.zw-trait-carrier { color: #e2c4a0; }
+.zw-trait-tough,
+.zw-trait-steady { color: #d9c6f5; }
+
+/* ---------- Spielanzeige: Gerüst ---------- */
+
+.zw-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.zw-top {
+  position: absolute;
+  top: var(--pad-t);
+  left: var(--pad-l);
+  right: var(--pad-r);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.7em;
+}
+
+.zw-bottom {
+  position: absolute;
+  bottom: var(--pad-b);
+  left: var(--pad-l);
+  right: var(--pad-r);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 0.7em;
+}
+
+.zw-left {
+  justify-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6em;
+  min-width: 0;
+}
+
+.zw-right {
+  justify-self: end;
+  min-width: 0;
+}
+
+.zw-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6em;
+  min-width: 0;
+}
+
+/* ---------- oben links: Vorräte ---------- */
+
+.zw-res {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 0.1em;
+  padding: 0.3em 0.45em;
+}
+
+.zw-res-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.6em;
+  border-radius: var(--r-s);
+  font-size: 1.14em;
+  font-weight: 700;
+}
+
+.zw-res-item .zw-icon {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.zw-res-n {
+  min-width: 1.4em;
+}
+
+.zw-res-lives .zw-icon { color: var(--ember); }
+.zw-res-gold .zw-icon { color: var(--gold); }
+
+.zw-res-score {
+  font-size: 0.92em;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.zw-res-score .zw-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.zw-res-lives.zw-low .zw-res-n {
+  color: var(--warn);
+}
+
+.zw-hurt {
+  animation: zw-hurt 0.5s var(--ease);
+}
+
+@keyframes zw-hurt {
+  0% { transform: translateX(0); background: rgba(255, 120, 90, 0.42); }
+  20% { transform: translateX(-0.22em); }
+  40% { transform: translateX(0.2em); }
+  60% { transform: translateX(-0.12em); }
+  80% { transform: translateX(0.06em); }
+  100% { transform: translateX(0); background: rgba(255, 120, 90, 0); }
+}
+
+.zw-gain {
+  animation: zw-gain 0.6s var(--ease);
+}
+
+@keyframes zw-gain {
+  0% { background: rgba(246, 203, 92, 0.34); }
+  100% { background: rgba(246, 203, 92, 0); }
+}
+
+.zw-vignette {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(255, 110, 80, 0) 62%, rgba(255, 110, 80, 0.34) 100%);
+}
+
+.zw-vignette-on {
+  animation: zw-vignette 0.6s ease-out;
+}
+
+@keyframes zw-vignette {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- oben Mitte: Sonnenbogen, Zeitalter, Welle ---------- */
+
+.zw-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+  min-width: 0;
+}
+
+.zw-age {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.3em 1.1em 0.55em;
+  border-radius: 1.3em;
+}
+
+.zw-arc {
+  width: 31em;
+  max-width: 100%;
+}
+
+.zw-arc-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.zw-arc-dot {
+  fill: rgba(255, 255, 255, 0.3);
+  transition: fill 0.3s var(--ease);
+}
+
+.zw-arc-dot.zw-done {
+  fill: rgba(255, 255, 255, 0.86);
+}
+
+.zw-arc-dot.zw-now {
+  fill: transparent;
+}
+
+.zw-arc-boss {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 1.5;
+}
+
+.zw-arc-boss.zw-done {
+  fill: var(--gold);
+  stroke: var(--gold);
+}
+
+.zw-arc-boss.zw-now {
+  stroke: transparent;
+}
+
+/* Welle mit Zwischenboss: kleinerer Ring, etwas zarter. */
+.zw-arc-mid {
+  stroke: rgba(255, 255, 255, 0.34);
+  stroke-width: 1.2;
+}
+
+.zw-arc-age {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.6s var(--ease);
+}
+
+.zw-arc-age .f {
+  fill: rgba(255, 255, 255, 0.42);
+  stroke: none;
+}
+
+.zw-arc-age.zw-done {
+  stroke: rgba(255, 255, 255, 0.8);
+}
+
+.zw-arc-age.zw-done .f {
+  fill: rgba(255, 255, 255, 0.8);
+}
+
+.zw-arc-age.zw-now {
+  stroke: var(--accent-text);
+  stroke-width: 2;
+}
+
+.zw-arc-age.zw-now .f {
+  fill: var(--accent-text);
+}
+
+.zw-arc-sun {
+  transition: transform 0.8s var(--ease);
+}
+
+.zw-arc-halo {
+  fill: var(--gold);
+  opacity: 0.22;
+}
+
+.zw-arc-disc {
+  fill: var(--gold);
+}
+
+.zw-arc-moon {
+  display: none;
+  fill: #e8eeff;
+}
+
+.zw-arc-sun.zw-night .zw-arc-disc {
+  display: none;
+}
+
+.zw-arc-sun.zw-night .zw-arc-moon {
+  display: block;
+  transform: scale(1.25);
+}
+
+.zw-arc-sun.zw-night .zw-arc-halo {
+  fill: #cfdcff;
+}
+
+.zw-age-line {
+  display: flex;
+  align-items: center;
+  gap: 0.65em;
+  margin-top: -0.1em;
+}
+
+.zw-age-text {
+  min-width: 0;
+}
+
+.zw-age-name {
+  display: block;
+  font-family: var(--display);
+  font-size: 1.32em;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.zw-age-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: 0.84em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.zw-agepips {
+  display: none;
+  align-items: center;
+  gap: 0.28em;
+}
+
+.zw-agepip {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.zw-agepip.zw-done {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.zw-agepip.zw-now {
+  background: var(--gold);
+  box-shadow: 0 0 0 0.16em rgba(246, 203, 92, 0.28);
+}
+
+.zw-agepip-boss {
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 0.15em;
+  transform: rotate(45deg);
+}
+
+.zw-agepip-mid {
+  width: 0.5em;
+  height: 0.5em;
+}
+
+.zw-boss {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.4em 0.9em;
+  border-radius: 2em;
+  font-weight: 650;
+  pointer-events: none;
+}
+
+.zw-boss .zw-icon {
+  color: var(--gold);
+}
+
+.zw-boss-track {
+  width: 13em;
+  height: 0.6em;
+  border-radius: 1em;
+  background: var(--sink);
+  overflow: hidden;
+}
+
+.zw-boss-fill {
+  display: block;
+  height: 100%;
+  border-radius: 1em;
+  background: linear-gradient(90deg, #ff9c6b, #ffcb6b);
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+
+/* Zweiter Boss zugleich: schmalere Zeile unter der Bossleiste. */
+.zw-boss-minor {
+  margin-top: -0.2em;
+  padding: 0.25em 0.8em;
+  font-size: 0.8em;
+  opacity: 0.92;
+}
+
+.zw-boss-minor .zw-boss-track {
+  width: 10em;
+  height: 0.5em;
+}
+
+.zw-boss-minor .zw-boss-fill {
+  background: linear-gradient(90deg, #f3b07e, #f5d38f);
+}
+
+.zw-paused {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.4em 0.9em;
+  border-radius: 2em;
+  font-weight: 650;
+  pointer-events: none;
+}
+
+.zw-banners {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.zw-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.5em 1.2em;
+  border-radius: 2em;
+  pointer-events: none;
+  animation: zw-drop 0.22s var(--ease) both;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.zw-banner-text {
+  font-family: var(--display);
+  font-size: 1.45em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.zw-banner-sub {
+  color: var(--muted);
+  font-size: 0.9em;
+  max-width: 24em;
+}
+
+.zw-banner .zw-icon {
+  width: 1.4em;
+  height: 1.4em;
+  color: var(--accent-text);
+}
+
+.zw-banner-boss .zw-icon,
+.zw-banner-perfect .zw-icon {
+  color: var(--gold);
+}
+
+.zw-banner-mega {
+  box-shadow: var(--shadow), 0 0 0 1.5px rgba(246, 203, 92, 0.6), 0 0 2em rgba(246, 203, 92, 0.35);
+}
+
+.zw-banner-mega .zw-banner-text {
+  font-size: 1.7em;
+  color: var(--gold);
+}
+
+.zw-banner-mega .zw-icon {
+  width: 1.7em;
+  height: 1.7em;
+  color: var(--gold);
+}
+
+.zw-banner-good .zw-icon,
+.zw-banner-role .zw-icon {
+  color: var(--good);
+}
+
+.zw-banner.zw-out,
+.zw-toast.zw-out {
+  opacity: 0;
+  transform: translateY(-0.4em);
+}
+
+@keyframes zw-drop {
+  from { opacity: 0; transform: translateY(-0.6em); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- oben rechts: Tempo und Menü ---------- */
+
+.zw-ctl {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.3em;
+}
+
+.zw-speed .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* ---------- unten Mitte: Bauleiste ---------- */
+
+.zw-build {
+  display: flex;
+  gap: 0.4em;
+  padding: 0.45em;
+  max-width: 100%;
+  border-radius: 1.3em;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15) brightness(0.8);
+  backdrop-filter: blur(10px) saturate(1.15) brightness(0.8);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+
+.zw-lowfx .zw-build {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(22, 27, 37, 0.9);
+}
+
+.zw-root .zw-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  width: 7em;
+  padding: 0.55em 0.3em 0.4em;
+  border-radius: 0.9em;
+  background: var(--raise);
+  border: 1px solid transparent;
+  transition: transform 0.18s var(--ease), background 0.18s var(--ease), border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.zw-root .zw-card:hover {
+  background: var(--raise-2);
+}
+
+.zw-card-stripe {
+  position: absolute;
+  top: 0;
+  left: 1.1em;
+  right: 1.1em;
+  height: 0.24em;
+  border-radius: 0 0 0.3em 0.3em;
+  background: var(--role);
+}
+
+.zw-card-key {
+  position: absolute;
+  top: 0.5em;
+  left: 0.45em;
+}
+
+.zw-card-air {
+  position: absolute;
+  top: 0.4em;
+  right: 0.4em;
+  color: #a9d4ff;
+}
+
+.zw-card-air .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+.zw-card-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.7em;
+  height: 3.7em;
+}
+
+.zw-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.15em 0.2em rgba(0, 0, 0, 0.3));
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.zw-card-roleicon,
+.zw-card-lock {
+  position: absolute;
+  display: none;
+  color: var(--role-text);
+}
+
+.zw-card-roleicon .zw-icon {
+  width: 2.2em;
+  height: 2.2em;
+}
+
+.zw-noimg .zw-card-img {
+  display: none;
+}
+
+.zw-noimg .zw-card-roleicon {
+  display: block;
+}
+
+.zw-card-miss {
+  position: absolute;
+  bottom: -0.1em;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.12em 0.5em;
+  border-radius: 1em;
+  background: rgba(20, 22, 30, 0.86);
+  color: var(--warn);
+  font-size: 0.7em;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.zw-card-miss:empty {
+  display: none;
+}
+
+.zw-card-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  width: 100%;
+  height: 2.3em;
+  margin-top: 0.15em;
+  font-size: 0.78em;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  hyphens: manual;
+  overflow-wrap: break-word;
+}
+
+.zw-card .zw-price {
+  font-size: 0.92em;
+}
+
+.zw-card-locktext {
+  font-size: 0.72em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.zw-card-locktext:empty {
+  display: none;
+}
+
+.zw-card.zw-poor .zw-card-img {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+
+.zw-card.zw-poor .zw-card-name,
+.zw-card.zw-poor .zw-price {
+  color: var(--muted);
+}
+
+.zw-card.zw-locked {
+  cursor: default;
+}
+
+.zw-card.zw-locked .zw-card-img {
+  opacity: 0.22;
+  filter: grayscale(1) brightness(0.6);
+}
+
+.zw-card.zw-locked .zw-card-roleicon {
+  opacity: 0.3;
+}
+
+.zw-card.zw-locked .zw-card-lock {
+  display: block;
+  color: var(--muted);
+}
+
+.zw-card.zw-locked .zw-card-lock .zw-icon {
+  width: 1.6em;
+  height: 1.6em;
+}
+
+.zw-card.zw-locked .zw-price,
+.zw-card.zw-locked .zw-card-key,
+.zw-card.zw-locked .zw-card-air {
+  display: none;
+}
+
+.zw-card.zw-locked .zw-card-name {
+  height: 1.15em;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  color: var(--muted);
+}
+
+.zw-card.zw-locked .zw-card-stripe {
+  opacity: 0.45;
+}
+
+.zw-root .zw-card.zw-chosen {
+  transform: translateY(-0.55em);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--accent-text);
+  box-shadow: 0 0.5em 1em rgba(0, 0, 0, 0.3);
+}
+
+.zw-card-new {
+  animation: zw-card-new 0.5s var(--ease);
+}
+
+@keyframes zw-card-new {
+  0% { transform: translateY(0.9em) scale(0.92); opacity: 0.2; }
+  60% { transform: translateY(-0.3em) scale(1.03); opacity: 1; }
+  100% { transform: none; }
+}
+
+/* ---------- Meldungen ---------- */
+
+.zw-toasts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.zw-toasts-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--pad-b) + 1em);
+  pointer-events: none;
+}
+
+.zw-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.42em 0.95em 0.42em 0.7em;
+  border-radius: 2em;
+  background: var(--glass-solid);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  font-size: 0.95em;
+  animation: zw-rise 0.2s var(--ease) both;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.zw-toast .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--muted);
+}
+
+.zw-toast-warn .zw-icon { color: var(--warn); }
+.zw-toast-good .zw-icon { color: var(--good); }
+
+.zw-nudge {
+  animation: zw-nudge 0.3s var(--ease);
+}
+
+@keyframes zw-rise {
+  from { opacity: 0; transform: translateY(0.5em); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes zw-nudge {
+  0%, 100% { transform: none; }
+  30% { transform: translateX(-0.2em); }
+  65% { transform: translateX(0.2em); }
+}
+
+/* ---------- unten rechts: nächste Welle ---------- */
+
+.zw-wave {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+  width: clamp(16em, 23vw, 21em);
+  max-width: 100%;
+  padding: 0.65em 0.7em 0.7em;
+}
+
+.zw-wave-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25em 0.5em;
+  min-height: 1.6em;
+}
+
+.zw-wave-title {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.zw-wave-boss {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0.1em 0.5em 0.1em 0.35em;
+  border-radius: 1em;
+  background: rgba(246, 203, 92, 0.16);
+  color: var(--gold);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.zw-wave-boss-mid {
+  background: rgba(246, 203, 92, 0.1);
+  font-weight: 650;
+}
+
+.zw-wave-boss .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+.zw-wave-head .zw-switch {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.zw-wave-hint {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin-top: -0.3em;
+  font-size: 0.82em;
+  line-height: 1.25;
+  color: var(--muted);
+  hyphens: manual;
+}
+
+.zw-wave-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+}
+
+.zw-root .zw-foe {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 0.25em;
+  padding: 0.2em 0.5em 0.2em 0.25em;
+  border-radius: 0.7em;
+  background: var(--raise);
+  text-align: left;
+  transition: background 0.16s var(--ease);
+}
+
+.zw-root .zw-foe:hover {
+  background: var(--raise-2);
+}
+
+.zw-foe-img {
+  grid-row: 1 / 3;
+  width: 2.4em;
+  height: 2.4em;
+  object-fit: contain;
+}
+
+.zw-foe-img.zw-noimg {
+  visibility: hidden;
+  width: 0.4em;
+}
+
+.zw-foe-n {
+  align-self: end;
+  font-weight: 700;
+  font-size: 0.92em;
+  line-height: 1.1;
+}
+
+.zw-foe .zw-traits {
+  align-self: start;
+  display: flex;
+  gap: 0.12em;
+  min-height: 0.95em;
+}
+
+.zw-foe .zw-traits .zw-icon {
+  width: 0.95em;
+  height: 0.95em;
+  stroke-width: 2.1;
+}
+
+.zw-foe-boss {
+  box-shadow: inset 0 0 0 1px rgba(246, 203, 92, 0.5);
+}
+
+.zw-wave-foot {
+  display: flex;
+}
+
+.zw-start {
+  flex: 1;
+  min-height: 2.9em;
+  font-size: 1.04em;
+}
+
+.zw-start .zw-kbd {
+  margin-left: auto;
+}
+
+.zw-start-label {
+  white-space: nowrap;
+}
+
+.zw-kbd-space svg {
+  display: block;
+  width: 1.6em;
+  height: 0.7em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.zw-start-bonus {
+  padding: 0.1em 0.5em;
+  border-radius: 1em;
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font-size: 0.86em;
+}
+
+.zw-wave-status {
+  flex: 1;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  min-height: 2.9em;
+  border-radius: var(--r-s);
+  background: var(--sink);
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.zw-wave-count {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 1.15em;
+}
+
+/* ---------- unten links: Zeitglocke, „Alle modernisieren“ ---------- */
+
+.zw-abilitybox {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.zw-root .zw-ability {
+  --cd: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 4.4em;
+  height: 4.4em;
+  border-radius: 50%;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px) brightness(0.8);
+  backdrop-filter: blur(10px) brightness(0.8);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  transition: transform 0.16s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.zw-ability:hover {
+  transform: scale(1.04);
+}
+
+.zw-ability:active {
+  transform: scale(0.97);
+}
+
+.zw-ability-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--gold) calc((1 - var(--cd)) * 360deg), rgba(255, 255, 255, 0.16) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 0.34em), #000 calc(100% - 0.3em));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 0.34em), #000 calc(100% - 0.3em));
+}
+
+.zw-ability-icon {
+  color: var(--muted);
+  opacity: 0.6;
+  transition: color 0.3s, opacity 0.3s;
+}
+
+.zw-ability-icon .zw-icon {
+  width: 2.2em;
+  height: 2.2em;
+}
+
+.zw-ability.zw-ready {
+  box-shadow: var(--shadow), 0 0 1.2em rgba(246, 203, 92, 0.35);
+}
+
+.zw-ability.zw-ready .zw-ability-icon {
+  color: var(--gold);
+  opacity: 1;
+}
+
+.zw-ability.zw-armed {
+  box-shadow: var(--shadow), 0 0 0 0.25em rgba(246, 203, 92, 0.4);
+}
+
+.zw-ability .zw-kbd {
+  position: absolute;
+  right: -0.1em;
+  bottom: -0.1em;
+  background: var(--glass-solid);
+  opacity: 1;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.zw-ability-text {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35em 0.8em;
+  border-radius: var(--r-s);
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.zw-ability-name {
+  font-weight: 700;
+  font-size: 0.92em;
+}
+
+.zw-ability-state {
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.zw-root .zw-modall {
+  gap: 0.6em;
+  background: var(--glass) !important;
+  border-radius: 2em;
+  padding: 0.4em 1em 0.4em 0.8em;
+}
+
+.zw-modall > .zw-ic {
+  color: var(--gold);
+}
+
+.zw-modall-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.zw-modall.zw-poor .zw-price {
+  color: var(--muted);
+}
+
+/* ---------- Turmkarte ---------- */
+
+.zw-tower {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65em;
+  width: 22em;
+  max-width: calc(100vw - var(--pad-l) - var(--pad-r));
+  padding: 0.8em;
+  animation: zw-slide 0.2s var(--ease) both;
+}
+
+@keyframes zw-slide {
+  from { opacity: 0; transform: translateX(-0.7em); }
+  to { opacity: 1; transform: none; }
+}
+
+.zw-tower-close {
+  position: absolute;
+  top: 0.35em;
+  right: 0.35em;
+  width: 2.1em;
+  height: 2.1em;
+  color: var(--muted);
+}
+
+.zw-tower-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  padding-right: 1.8em;
+}
+
+.zw-tower-img {
+  flex: none;
+  width: 4.6em;
+  height: 4.6em;
+  object-fit: contain;
+  border-radius: 0.9em;
+  background: var(--raise);
+}
+
+.zw-tower-img.zw-noimg {
+  visibility: hidden;
+  width: 0;
+}
+
+.zw-tower-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25em;
+  min-width: 0;
+}
+
+.zw-tower-name {
+  font-weight: 700;
+  font-size: 1.1em;
+  line-height: 1.15;
+}
+
+.zw-tower-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+}
+
+.zw-pips {
+  display: inline-flex;
+  gap: 0.22em;
+}
+
+.zw-pip {
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.5);
+}
+
+.zw-pip-on {
+  background: var(--gold);
+  box-shadow: none;
+}
+
+.zw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.15em 0.6em 0.15em 0.4em;
+  border-radius: 0.7em;
+  line-height: 1.2;
+  hyphens: none;
+  background: var(--raise);
+  color: var(--muted);
+  font-size: 0.78em;
+  font-weight: 600;
+}
+
+.zw-badge .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+.zw-badge-old {
+  background: rgba(246, 203, 92, 0.17);
+  color: var(--gold);
+}
+
+.zw-stats {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.2em 0.8em;
+  font-size: 0.9em;
+}
+
+.zw-stats dt {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  color: var(--muted);
+}
+
+.zw-stats dt .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.zw-stats dd {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 0.35em;
+  min-width: 0;
+  font-weight: 650;
+  text-align: right;
+}
+
+/* Lange Vorher-nachher-Werte (Brand, Super- und Megawaffe) brechen am Pfeil um statt aus der Karte zu ragen. */
+.zw-stats dd > span {
+  white-space: nowrap;
+}
+
+.zw-old {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.zw-arrow {
+  color: var(--muted);
+}
+
+.zw-up {
+  color: var(--good);
+}
+
+.zw-down {
+  color: var(--warn);
+}
+
+.zw-reaches {
+  display: flex;
+  gap: 1em;
+  margin-top: 0.45em;
+  font-size: 0.8em;
+}
+
+.zw-reach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  color: var(--text);
+}
+
+.zw-reach .zw-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.zw-reach.zw-off {
+  color: var(--muted);
+  opacity: 0.75;
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+}
+
+.zw-tower-buff {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: 0.4em;
+  font-size: 0.8em;
+  color: var(--gold);
+}
+
+.zw-tower-buff .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.zw-tower-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 0.3em;
+  font-size: 0.78em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.zw-tower-modes .zw-seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.3em 0.25em 0.25em;
+  gap: 0.1em;
+}
+
+.zw-tower-modes .zw-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.zw-seg-text {
+  font-size: 0.64em;
+  font-weight: 600;
+  hyphens: none;
+}
+
+.zw-tower-record {
+  display: flex;
+  gap: 1.2em;
+  font-size: 0.82em;
+  color: var(--muted);
+}
+
+.zw-tower-record span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  white-space: pre;
+}
+
+.zw-tower-record b {
+  color: var(--text);
+}
+
+.zw-tower-record .zw-icon {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.zw-tower-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4em;
+}
+
+.zw-root .zw-act {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-content: stretch;
+  gap: 0 0.45em;
+  min-height: 3.1em;
+  padding: 0.4em 0.6em;
+  text-align: left;
+}
+
+.zw-act > .zw-ic {
+  grid-row: 1 / 3;
+}
+
+.zw-act-text {
+  display: contents;
+}
+
+.zw-act-label {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 0.94em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* „Zur Megawaffe verschmelzen“ ist zu lang für eine Zeile neben dem Preis. */
+.zw-act-fuse .zw-act-label {
+  min-width: 0;
+  white-space: normal;
+}
+
+.zw-act-sub {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  font-size: 0.7em;
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0.88;
+  hyphens: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zw-act .zw-price {
+  grid-column: 3;
+  grid-row: 1;
+  font-size: 0.92em;
+}
+
+.zw-act .zw-kbd {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.zw-act-sell .zw-kbd {
+  display: none;
+}
+
+/* Schmale Knöpfe (Ausbauen, Verkaufen): Preis in die zweite Zeile, rechts neben die Unterzeile. */
+.zw-root .zw-act:not(.zw-act-mod) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.zw-act:not(.zw-act-mod) .zw-act-sub {
+  grid-column: 2;
+}
+
+.zw-act:not(.zw-act-mod) .zw-price {
+  grid-column: 3;
+  grid-row: 2;
+  font-size: 0.82em;
+}
+
+.zw-act.zw-act-sell .zw-price {
+  grid-row: 1;
+  font-size: 0.84em;
+}
+
+.zw-act-sell .zw-act-sub {
+  grid-column: 1 / -1;
+}
+
+/* In den schmalen Knöpfen ist für ein Symbol kein Platz; die Beschriftung trägt allein. */
+.zw-act-up > .zw-ic,
+.zw-act-sell > .zw-ic {
+  display: none;
+}
+
+.zw-act.zw-act-up .zw-act-label,
+.zw-act.zw-act-sell .zw-act-label,
+.zw-act.zw-act-up .zw-act-sub {
+  grid-column: 1 / 3;
+}
+
+.zw-act.zw-act-sell .zw-act-sub {
+  grid-column: 1 / -1;
+}
+
+.zw-act:not(.zw-act-mod) .zw-kbd {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.zw-root .zw-act-mod {
+  grid-column: 1 / 3;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  background: var(--accent) !important;
+  border-color: transparent !important;
+  color: var(--on-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.zw-act-mod .zw-act-label { grid-column: 3; }
+.zw-act-mod .zw-act-sub { grid-column: 3 / -1; }
+.zw-act-mod .zw-price { grid-column: 4; }
+.zw-act-mod .zw-kbd { grid-column: 5; }
+
+/* ---------- Ausbauzweige, Verschmelzen, Superwaffen ---------- */
+
+.zw-root .zw-tower {
+  max-height: calc(100vh - 12em);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.zw-tower-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65em;
+  min-width: 0;
+}
+
+.zw-tower-normal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65em;
+}
+
+.zw-tower-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+}
+
+.zw-badge-branch {
+  background: color-mix(in srgb, var(--role) 22%, transparent);
+  color: var(--text);
+  cursor: help;
+}
+
+.zw-badge-super {
+  background: linear-gradient(100deg, var(--gold), #ffe7a3);
+  color: #3a2a06;
+  letter-spacing: 0.02em;
+}
+
+/* Megawaffe: über der Superwaffe im Rang – größeres Abzeichen in Großbuchstaben mit hellem Rand und sanftem Schein. */
+.zw-badge-mega {
+  padding: 0.2em 0.75em 0.2em 0.5em;
+  background: linear-gradient(100deg, #f6cb5c, #fff1c7 48%, #f2b84a);
+  color: #3a2406;
+  font-size: 0.82em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1.5px rgba(255, 241, 199, 0.85), 0 0 0.9em rgba(246, 203, 92, 0.5);
+}
+
+.zw-badge-mega .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.zw-tower-mega {
+  box-shadow: var(--shadow), inset 0 0 0 1.5px rgba(246, 203, 92, 0.7), 0 0 1.8em rgba(246, 203, 92, 0.3);
+}
+
+.zw-tower-mega .zw-tower-name {
+  color: var(--gold);
+}
+
+.zw-tower-mega .zw-tower-img {
+  background: radial-gradient(circle at 50% 60%, rgba(246, 203, 92, 0.5), color-mix(in srgb, var(--role) 35%, transparent) 45%, var(--raise) 75%);
+}
+
+/* Die Art des Angriffs ändert sich (Vorschau beim Verschmelzen oder Ausbauen). */
+.zw-attack-change {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  margin-bottom: 0.35em;
+  padding: 0.3em 0.6em;
+  border-radius: var(--r-s);
+  background: rgba(246, 203, 92, 0.14);
+  color: var(--gold);
+  font-size: 0.8em;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.zw-attack-change .zw-icon {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.zw-fuse-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+}
+
+.zw-fuse-icon .zw-icon {
+  width: 1.8em;
+  height: 1.8em;
+  color: var(--gold);
+}
+
+.zw-fuse-mega .zw-fuse-name {
+  font-size: 1.4em;
+  text-shadow: 0 0 0.6em rgba(246, 203, 92, 0.35);
+}
+
+.zw-tower-super {
+  box-shadow: var(--shadow), inset 0 0 0 1px color-mix(in srgb, var(--role) 55%, transparent), 0 0 1.4em color-mix(in srgb, var(--role) 22%, transparent);
+}
+
+.zw-tower-super .zw-tower-img {
+  background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--role) 40%, transparent), var(--raise) 72%);
+}
+
+.zw-roledot {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  background: var(--role);
+  color: #fff;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);
+}
+
+.zw-roledot .zw-icon {
+  width: 1.15em;
+  height: 1.15em;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+/* Gaben einer Superwaffe */
+.zw-gifts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+
+.zw-gifts .zw-tower-label {
+  margin-bottom: 0;
+}
+
+.zw-gift {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+}
+
+.zw-gift-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.zw-gift-name {
+  font-weight: 700;
+  font-size: 0.92em;
+}
+
+.zw-gift-desc {
+  font-size: 0.78em;
+  color: var(--muted);
+}
+
+.zw-gift-inert .zw-gift-desc {
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+}
+
+.zw-gift-inert-note {
+  font-size: 0.74em;
+  font-weight: 600;
+  color: var(--warn);
+}
+
+/* Zweigwahl */
+.zw-branch-head {
+  flex-wrap: wrap;
+}
+
+.zw-branch-title {
+  margin-right: auto;
+}
+
+.zw-branch-head .zw-price {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.15em;
+  color: var(--gold);
+}
+
+.zw-branch-note {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--warn);
+}
+
+.zw-branch.zw-poor .zw-price {
+  color: var(--muted);
+}
+
+.zw-branch-opts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4em;
+}
+
+.zw-root .zw-branch-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.3em;
+  padding: 0.55em 0.6em 0.6em;
+  text-align: left;
+  white-space: normal;
+}
+
+.zw-branch-opt > .zw-ic {
+  display: grid;
+  place-items: center;
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--role) 30%, transparent);
+}
+
+.zw-branch-opt > .zw-ic .zw-icon,
+.zw-branch-opt > .zw-icon {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.zw-branch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  min-width: 0;
+}
+
+.zw-branch-name {
+  font-weight: 700;
+  font-size: 0.95em;
+  line-height: 1.15;
+}
+
+.zw-branch-sum {
+  font-size: 0.74em;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--muted);
+  hyphens: auto;
+}
+
+.zw-branch-changes {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.72em;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.zw-root .zw-branch-opt:hover,
+.zw-root .zw-branch-opt:focus-visible {
+  border-color: var(--accent) !important;
+}
+
+/* Verschmelzen-Knopf: lebendig, sobald zwei Nachbarn bereitstehen */
+.zw-root .zw-act-fuse {
+  grid-column: 1 / 3;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.zw-act.zw-act-fuse .zw-act-sub {
+  grid-column: 2 / -1;
+}
+
+.zw-act.zw-act-fuse .zw-price {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.zw-act.zw-act-fuse .zw-kbd {
+  grid-column: 4;
+}
+
+.zw-root .zw-act-fuse.zw-live {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--role) 55%, #1b2130), color-mix(in srgb, var(--gold) 45%, #1b2130)) !important;
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent) !important;
+}
+
+.zw-act-fuse > .zw-ic {
+  color: var(--gold);
+}
+
+.zw-sell-wide .zw-act-sell {
+  grid-column: 1 / 3;
+}
+
+/* Verschmelzen-Blatt */
+.zw-tower-fusing {
+  box-shadow: var(--shadow), inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent);
+}
+
+.zw-fuse {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  animation: zw-slide 0.18s var(--ease) both;
+}
+
+.zw-fuse-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+}
+
+.zw-fuse-head > .zw-icon {
+  flex: none;
+  width: 1.8em;
+  height: 1.8em;
+  color: var(--gold);
+}
+
+.zw-fuse-kicker {
+  font-size: 0.72em;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.zw-fuse-name {
+  font-family: var(--display);
+  font-size: 1.25em;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--gold);
+}
+
+.zw-fuse-core {
+  margin: 0;
+  font-size: 0.8em;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.zw-fuse-label {
+  margin-bottom: 0;
+}
+
+.zw-fuse-count {
+  margin-left: auto;
+  padding: 0.05em 0.5em;
+  border-radius: 0.6em;
+  background: var(--raise);
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.zw-fuse-count.zw-full {
+  background: color-mix(in srgb, var(--good) 25%, transparent);
+  color: var(--good);
+}
+
+.zw-fuse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.zw-root .zw-fuse-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  min-height: 2.9em;
+  padding: 0.35em 0.6em 0.35em 0.4em;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line);
+  background: var(--raise);
+  text-align: left;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.zw-root .zw-fuse-chip:hover {
+  background: var(--raise-2);
+}
+
+.zw-root .zw-fuse-chip.zw-on {
+  border-color: color-mix(in srgb, var(--role) 80%, white 10%);
+  background: color-mix(in srgb, var(--role) 20%, transparent);
+}
+
+.zw-fuse-chip-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.zw-fuse-chip-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  min-width: 0;
+}
+
+.zw-fuse-chip-from {
+  font-size: 0.74em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zw-fuse-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.45em;
+  height: 1.45em;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+  color: transparent;
+}
+
+.zw-fuse-check .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+.zw-on .zw-fuse-check {
+  background: var(--good);
+  box-shadow: none;
+  color: #12301a;
+}
+
+.zw-fuse-note {
+  margin: 0;
+  font-size: 0.74em;
+  color: var(--muted);
+}
+
+.zw-fuse-foot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4em;
+}
+
+.zw-root .zw-fuse-foot .zw-btn {
+  padding: 0.5em 0.75em;
+  white-space: nowrap;
+}
+
+.zw-fuse-go .zw-price {
+  margin-left: auto;
+}
+
+.zw-fuse-go .zw-kbd {
+  display: none;
+}
+
+.zw-tower-badges {
+  align-self: stretch;
+}
+
+.zw-fuse-list.zw-nudge {
+  animation: zw-nudge 0.32s var(--ease);
+}
+
+/* Marken über dem Spielfeld während der Zutatenwahl */
+.zw-fusemarks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.zw-root .zw-fusemark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 2.3em;
+  height: 2.3em;
+  margin: -1.15em 0 0 -1.15em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--role) 70%, #10141c);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0.25em 0.8em rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
+}
+
+.zw-fusemark > .zw-ic .zw-icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.zw-fusemark-check {
+  position: absolute;
+  right: -0.35em;
+  bottom: -0.35em;
+  display: grid;
+  place-items: center;
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 50%;
+  background: rgba(16, 20, 28, 0.85);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.6);
+  color: transparent;
+}
+
+.zw-fusemark-check .zw-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+.zw-root .zw-fusemark.zw-on {
+  border-color: var(--good);
+  box-shadow: 0 0 0 0.25em color-mix(in srgb, var(--good) 35%, transparent), 0 0.25em 0.8em rgba(0, 0, 0, 0.35);
+}
+
+.zw-fusemark.zw-on .zw-fusemark-check {
+  background: var(--good);
+  box-shadow: none;
+  color: #12301a;
+}
+
+@media (max-height: 560px) {
+  .zw-root .zw-tower {
+    grid-template-rows: auto;
+    max-height: calc(100vh - 1.5em);
+  }
+
+  .zw-tower-col-a { grid-column: 1; grid-row: 1; }
+  .zw-tower-col-b { grid-column: 2; grid-row: 1; }
+
+  .zw-root .zw-branch-head,
+  .zw-root .zw-fuse-label {
+    display: flex;
+  }
+
+  .zw-branch-changes,
+  .zw-fuse-note,
+  .zw-fuse-core {
+    display: none;
+  }
+}
+
+.zw-act-mod .zw-price .zw-icon {
+  color: inherit;
+}
+
+.zw-act-img {
+  grid-row: 1 / 3;
+  width: 2.6em;
+  height: 2.6em;
+  margin: -0.2em 0;
+  object-fit: contain;
+  border-radius: 0.5em;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.zw-act.zw-poor .zw-act-sub {
+  color: var(--warn);
+  opacity: 1;
+}
+
+.zw-act-mod.zw-poor .zw-act-sub {
+  color: inherit;
+}
+
+.zw-act-sell .zw-price {
+  color: var(--good);
+}
+
+.zw-act-sell > .zw-ic,
+.zw-act-up > .zw-ic {
+  color: var(--muted);
+}
+
+/* ---------- Hinweiskarten ---------- */
+
+.zw-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(22em, calc(100vw - 16px));
+  padding: 0.75em 0.85em;
+  background: var(--glass-solid);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.zw-tip-in {
+  opacity: 1;
+  transition: opacity 0.14s ease-out;
+}
+
+.zw-tipcard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.zw-tip-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.zw-tip-thumb {
+  width: 3em;
+  height: 3em;
+  object-fit: contain;
+  border-radius: 0.6em;
+  background: var(--raise);
+}
+
+.zw-tip-thumb.zw-noimg {
+  display: none;
+}
+
+.zw-tip-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+  font-size: 1.08em;
+  line-height: 1.2;
+}
+
+.zw-tip-sub {
+  font-size: 0.82em;
+  color: var(--muted);
+}
+
+.zw-tip-text {
+  font-size: 0.88em;
+}
+
+/* Eigenart der Waffe: der erste Satzteil der Beschreibung, hervorgehoben (bei Waffen des Pools mit Strich in ihrer Akzentfarbe). */
+.zw-tip-gist {
+  font-weight: 700;
+  color: var(--text, inherit);
+  padding-left: 0.4em;
+  border-left: 0.22em solid var(--weapon, transparent);
+}
+
+.zw-tip-flavor {
+  font-size: 0.84em;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.zw-tip-traits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  font-size: 0.84em;
+}
+
+.zw-tip-traits li {
+  display: flex;
+  gap: 0.5em;
+}
+
+.zw-tip-traits li > span:last-child {
+  color: var(--text);
+}
+
+.zw-tip-traits .zw-icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.zw-tip-counters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em 0.8em;
+  padding-top: 0.45em;
+  border-top: 1px solid var(--line);
+}
+
+.zw-tip-label {
+  font-size: 0.78em;
+  color: var(--muted);
+}
+
+/* ---------- Karte zur Zeitenwende ---------- */
+
+.zw-agecard {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 5.5em 1em 9em;
+}
+
+.zw-agecard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7em;
+  width: min(33em, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  padding: 1.1em 1.2em 1em;
+  background: rgba(18, 22, 30, 0.62);
+  border-radius: 1.4em;
+  cursor: pointer;
+  animation: zw-pop 0.32s var(--ease) both;
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.zw-agecard-card.zw-out {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+@keyframes zw-pop {
+  from { opacity: 0; transform: translateY(0.6em) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+.zw-agecard-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+}
+
+.zw-emblem-big {
+  width: 3.9em;
+  height: 3.9em;
+}
+
+.zw-emblem-big .zw-icon {
+  width: 2.3em;
+  height: 2.3em;
+}
+
+.zw-agecard-kicker {
+  font-size: 0.8em;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.zw-agecard-name {
+  font-family: var(--display);
+  font-size: 2.1em;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.zw-agecard-year {
+  color: var(--muted);
+}
+
+.zw-agecard-tagline {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.08em;
+}
+
+.zw-agecard-foes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+}
+
+.zw-root .zw-foe-big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 4.6em;
+  padding: 0.35em 0.3em 0.4em;
+}
+
+.zw-foe-big .zw-foe-img {
+  width: 3.4em;
+  height: 3.4em;
+}
+
+.zw-foe-name {
+  font-size: 0.76em;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.zw-foe-big .zw-traits {
+  align-self: center;
+  margin-top: 0.15em;
+}
+
+.zw-foe-shadow .zw-foe-img {
+  filter: brightness(0) invert(1) opacity(0.5);
+}
+
+.zw-agecard-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4em 0.6em;
+  padding: 0.5em 0.7em;
+  border-radius: var(--r-s);
+  background: var(--raise);
+  font-size: 0.88em;
+}
+
+.zw-agecard-new .zw-trait .zw-icon {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+.zw-agecard-newtext {
+  flex: 1 1 14em;
+}
+
+.zw-agecard-helps {
+  display: flex;
+  gap: 0.8em;
+}
+
+.zw-agecard-foot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.35em 1em;
+}
+
+.zw-agecard-gift,
+.zw-agecard-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  grid-column: 1;
+  font-size: 0.88em;
+}
+
+.zw-agecard-gift > .zw-ic,
+.zw-agecard-hint > .zw-ic {
+  color: var(--gold);
+}
+
+.zw-agecard-hint {
+  color: var(--muted);
+}
+
+.zw-agecard-go {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: end;
+  min-width: 6em;
+}
+
+/* ---------- Hinweise der ersten Partie ---------- */
+
+.zw-hint {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: 0;
+  height: 0;
+}
+
+.zw-hint-text {
+  position: absolute;
+  bottom: 0.75em;
+  left: 0;
+  transform: translateX(-50%);
+  padding: 0.45em 0.9em;
+  border-radius: 0.8em;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.35);
+  animation: zw-bob 1.8s ease-in-out infinite;
+}
+
+.zw-hint-arrow {
+  position: absolute;
+  bottom: 0.4em;
+  left: -0.4em;
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 0.12em;
+  background: var(--accent);
+  transform: rotate(45deg);
+  animation: zw-bob-arrow 1.8s ease-in-out infinite;
+}
+
+.zw-hint-in {
+  /* nur Einblenden: Der Behälter wird per transform an seine Stelle gesetzt, das darf keine Animation überschreiben. */
+  animation: zw-hint-fade 0.25s var(--ease) both;
+}
+
+@keyframes zw-hint-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zw-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-0.3em); }
+}
+
+@keyframes zw-bob-arrow {
+  0%, 100% { transform: translateY(0) rotate(45deg); }
+  50% { transform: translateY(-0.3em) rotate(45deg); }
+}
+
+/* ---------- Menüs ---------- */
+
+.zw-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  animation: zw-fade 0.22s ease-out both;
+}
+
+@keyframes zw-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.zw-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 13, 20, 0.5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.zw-modal[data-screen="main"] .zw-scrim {
+  background: linear-gradient(90deg, rgba(10, 13, 20, 0.62) 0%, rgba(10, 13, 20, 0.28) 45%, rgba(10, 13, 20, 0) 80%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.zw-modal[data-base="main"]:not([data-screen="main"]) .zw-scrim {
+  background: rgba(10, 13, 20, 0.36);
+}
+
+.zw-screen {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-height: 100%;
+  padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+  min-height: 0;
+}
+
+.zw-modal[data-screen="main"] .zw-screen {
+  justify-content: flex-start;
+  padding-left: clamp(1em, 7vw, 9em);
+}
+
+.zw-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.3em;
+  width: min(24em, 100%);
+  max-height: calc(100vh - 2em);
+  overflow-y: auto;
+  touch-action: pan-y;
+  padding: 1.8em 1.5em 1.4em;
+  border-radius: 1.5em;
+  animation: zw-pop 0.3s var(--ease) both;
+}
+
+.zw-main-head {
+  text-align: center;
+}
+
+.zw-title-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 3.4em;
+  height: 3.4em;
+  margin-bottom: 0.5em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, rgba(255, 176, 102, 0.38), rgba(255, 176, 102, 0.08) 70%);
+  color: var(--ember);
+}
+
+.zw-title-mark .zw-icon {
+  width: 2em;
+  height: 2em;
+}
+
+.zw-title-mark-dim {
+  background: var(--raise);
+  color: var(--muted);
+}
+
+.zw-title {
+  font-family: var(--display);
+  font-size: 3.3em;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  hyphens: none;
+}
+
+.zw-title-small {
+  font-size: 2.2em;
+}
+
+.zw-subtitle {
+  margin-top: 0.35em !important;
+  color: var(--muted);
+}
+
+.zw-main-head .zw-subtitle {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.15em;
+}
+
+.zw-pause .zw-subtitle {
+  font-family: inherit;
+  font-style: normal;
+  font-size: 0.92em;
+}
+
+.zw-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.zw-root .zw-menu-btn {
+  justify-content: flex-start;
+  gap: 0.8em;
+  min-height: 3.3em;
+  padding: 0.6em 1em;
+  border-radius: 0.9em;
+  font-size: 1.06em;
+  text-align: left;
+}
+
+.zw-menu-btn-text {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.zw-menu-btn small {
+  font-size: 0.72em;
+  font-weight: 500;
+  opacity: 0.88;
+  hyphens: none;
+}
+
+.zw-main-foot {
+  text-align: center;
+  font-size: 0.84em;
+  color: var(--muted);
+}
+
+.zw-sub {
+  display: flex;
+  flex-direction: column;
+  width: min(33em, 100%);
+  max-height: calc(100vh - 1.6em);
+  max-height: calc(100dvh - 1.6em);
+  border-radius: 1.5em;
+  overflow: hidden;
+  animation: zw-pop 0.26s var(--ease) both;
+}
+
+.zw-sub-wide {
+  width: min(62em, 100%);
+}
+
+.zw-sub-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.8em 1.2em 0.6em 0.8em;
+}
+
+.zw-h2 {
+  font-family: var(--display);
+  font-size: 1.7em;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.zw-h3 {
+  margin: 0 0 0.5em !important;
+  font-size: 0.8em;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.zw-sub-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  padding: 0.4em 1.4em 1em;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.zw-sub-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6em;
+  padding: 0.8em 1.4em 1.1em;
+  border-top: 1px solid var(--line);
+}
+
+.zw-go {
+  min-width: 11em;
+  min-height: 3em;
+  font-size: 1.08em;
+}
+
+.zw-choice {
+  display: grid;
+  gap: 0.6em;
+  margin-bottom: 1.2em;
+}
+
+.zw-maps,
+.zw-diffs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.zw-root .zw-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3em;
+  padding: 0.7em;
+  border-radius: 1em;
+  background: var(--raise);
+  border: 2px solid transparent;
+  text-align: left;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+
+.zw-root .zw-pick:hover {
+  background: var(--raise-2);
+}
+
+.zw-root .zw-pick.zw-on {
+  border-color: var(--accent-text);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.zw-pick-art {
+  display: block;
+  border-radius: 0.7em;
+  background: var(--sink);
+  padding: 0.2em;
+}
+
+.zw-mapsvg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.zw-map-ground {
+  fill: rgba(170, 205, 140, 0.34);
+}
+
+.zw-map-block {
+  fill: rgba(40, 60, 70, 0.55);
+}
+
+.zw-map-edge {
+  fill: none;
+  stroke: rgba(40, 30, 20, 0.5);
+  stroke-width: 1.05;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.zw-map-path {
+  fill: none;
+  stroke: #ecd9b4;
+  stroke-width: 0.72;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.zw-map-gate {
+  fill: #2a3040;
+  stroke: #a9d4ff;
+  stroke-width: 0.28;
+}
+
+.zw-map-flame {
+  fill: var(--ember);
+  stroke: #fff3d6;
+  stroke-width: 0.26;
+}
+
+.zw-pick-name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5em;
+  font-weight: 700;
+  font-size: 1.08em;
+}
+
+.zw-pick-tag {
+  font-size: 0.68em;
+  font-weight: 600;
+  color: var(--muted);
+  hyphens: none;
+}
+
+.zw-pick-text {
+  flex: 1;
+  font-size: 0.84em;
+  color: var(--muted);
+}
+
+.zw-pick-record,
+.zw-pick-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em 0.9em;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.zw-pick-record {
+  gap: 0.35em;
+  color: var(--muted);
+}
+
+.zw-pick-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.zw-pick-record .zw-icon,
+.zw-pick-facts .zw-icon {
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--gold);
+}
+
+.zw-pick-facts span:first-child .zw-icon {
+  color: var(--ember);
+}
+
+/* Anleitung */
+
+.zw-help {
+  columns: 2;
+  column-gap: 2.2em;
+  font-size: 0.94em;
+}
+
+.zw-help section {
+  break-inside: avoid;
+  margin-bottom: 1.2em;
+}
+
+.zw-help-goal,
+.zw-help-keysbox {
+  column-span: all;
+}
+
+.zw-help-goal p {
+  max-width: 44em;
+}
+
+.zw-help-list,
+.zw-help-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55em;
+}
+
+.zw-help-list li,
+.zw-help-steps li {
+  display: flex;
+  gap: 0.7em;
+}
+
+.zw-help-list small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.88em;
+}
+
+.zw-help-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.1em;
+  height: 2.1em;
+  border-radius: 0.6em;
+  background: var(--raise);
+  color: var(--role-text, var(--gold));
+  box-shadow: inset 0 -0.2em 0 var(--role, transparent);
+}
+
+.zw-help-traits .zw-help-mark {
+  color: inherit;
+}
+
+.zw-help-keys {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17em, 1fr));
+  gap: 0.45em 1.5em;
+}
+
+.zw-help-keys li {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+}
+
+.zw-help-keycaps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  flex: none;
+  min-width: 7.4em;
+}
+
+.zw-help-keycaps .zw-kbd {
+  display: block;
+  font-size: 0.78em;
+  opacity: 0.85;
+}
+
+/* Einstellungen */
+
+.zw-settings .zw-h3 {
+  margin-top: 1em !important;
+}
+
+.zw-settings .zw-h3:first-child {
+  margin-top: 0 !important;
+}
+
+.zw-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  min-height: 3em;
+  padding: 0.35em 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.zw-set-row-wrap {
+  flex-wrap: wrap;
+}
+
+.zw-set-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.zw-set-label small {
+  font-weight: 400;
+  font-size: 0.82em;
+  color: var(--muted);
+}
+
+.zw-set-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  flex: 0 1 15em;
+}
+
+.zw-set-value {
+  min-width: 3.2em;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.zw-slider {
+  --fill: 50%;
+  flex: 1;
+  min-width: 0;
+  height: 2em;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.zw-slider::-webkit-slider-runnable-track {
+  height: 0.45em;
+  border-radius: 1em;
+  background: linear-gradient(90deg, var(--accent-text) var(--fill), rgba(255, 255, 255, 0.2) var(--fill));
+}
+
+.zw-slider::-moz-range-track {
+  height: 0.45em;
+  border-radius: 1em;
+  background: linear-gradient(90deg, var(--accent-text) var(--fill), rgba(255, 255, 255, 0.2) var(--fill));
+}
+
+.zw-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.3em;
+  height: 1.3em;
+  margin-top: -0.43em;
+  border-radius: 50%;
+  background: #fff;
+  border: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.zw-slider::-moz-range-thumb {
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 50%;
+  background: #fff;
+  border: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.zw-set-quality .zw-seg-btn {
+  padding: 0.3em 0.9em;
+}
+
+/* Rückfrage */
+
+.zw-dialog {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1em;
+  background: rgba(10, 13, 20, 0.45);
+}
+
+.zw-dialog-card {
+  width: min(26em, 100%);
+  padding: 1.3em;
+  background: var(--glass-solid);
+  animation: zw-pop 0.2s var(--ease) both;
+}
+
+.zw-dialog-text {
+  margin-bottom: 1.1em !important;
+  font-size: 1.05em;
+}
+
+.zw-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6em;
+}
+
+/* Ergebnis */
+
+.zw-result {
+  width: min(40em, 100%);
+  padding: 1.5em 1.5em 0;
+  gap: 1em;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.zw-result-head {
+  text-align: center;
+}
+
+.zw-result-kicker {
+  margin-bottom: 0.5em;
+  font-size: 0.8em;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.zw-stars {
+  display: flex;
+  justify-content: center;
+  gap: 0.3em;
+  margin-bottom: 0.5em;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.zw-stars .zw-icon {
+  width: 2.6em;
+  height: 2.6em;
+}
+
+.zw-stars .zw-ic:nth-child(2) .zw-icon {
+  width: 3.2em;
+  height: 3.2em;
+}
+
+.zw-star-on {
+  color: var(--gold);
+  filter: drop-shadow(0 0 0.5em rgba(246, 203, 92, 0.45));
+}
+
+.zw-result-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5em;
+  flex-wrap: wrap;
+}
+
+.zw-result-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+
+.zw-result-score-n {
+  font-family: var(--display);
+  font-size: 2.6em;
+  line-height: 1;
+}
+
+.zw-result-score-l {
+  color: var(--muted);
+}
+
+.zw-result-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.9em 0.3em 0.7em;
+  border-radius: 2em;
+  background: var(--raise);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.92em;
+}
+
+.zw-result-record:empty {
+  display: none;
+}
+
+.zw-result-record.zw-new {
+  background: rgba(246, 203, 92, 0.18);
+  color: var(--gold);
+}
+
+.zw-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45em;
+}
+
+.zw-result-cell {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.55em;
+  align-items: center;
+  padding: 0.5em 0.65em;
+  border-radius: var(--r-s);
+  background: var(--raise);
+}
+
+.zw-result-cell .zw-ic {
+  grid-row: 1 / 3;
+  color: var(--muted);
+}
+
+.zw-result-cell dt {
+  font-size: 0.72em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zw-result-cell dd {
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.zw-result-foot {
+  margin: 0 -1.5em;
+  justify-content: center;
+}
+
+.zw-result-foot .zw-btn {
+  min-width: 10em;
+  min-height: 3em;
+}
+
+/* ---------- Anpassung an Fenstergrößen ---------- */
+
+/* Schmale Fenster: Bogen weicht den sechs Punkten des laufenden Zeitalters, Bauleiste rückt zusammen. */
+@media (max-width: 1180px), (max-height: 560px) {
+  .zw-arc {
+    display: none;
+  }
+
+  .zw-agepips {
+    display: inline-flex;
+  }
+
+  .zw-age {
+    padding: 0.4em 1em 0.4em 0.5em;
+    border-radius: 2em;
+  }
+
+  .zw-age-line {
+    margin-top: 0;
+  }
+
+  .zw-root .zw-card {
+    width: 5.9em;
+  }
+
+  .zw-wave {
+    width: clamp(14.5em, 23vw, 19em);
+  }
+}
+
+@media (max-width: 1180px) and (min-height: 561px) {
+  .zw-banner-sub {
+    display: none;
+  }
+}
+
+/* Handy quer: alles kleiner, die Turmkarte als Blatt am unteren Rand. */
+@media (max-height: 560px) {
+  .zw-root {
+    --pad-t: max(0.5em, env(safe-area-inset-top));
+    --pad-b: max(0.5em, env(safe-area-inset-bottom));
+  }
+
+  .zw-res-item {
+    padding: 0.2em 0.45em;
+    font-size: 1.02em;
+  }
+
+  .zw-res-score {
+    display: none;
+  }
+
+  .zw-emblem {
+    width: 1.9em;
+    height: 1.9em;
+  }
+
+  .zw-age-name {
+    font-size: 1.1em;
+  }
+
+  .zw-root .zw-card {
+    width: 5.1em;
+    padding: 0.45em 0.25em 0.3em;
+  }
+
+  .zw-card-art {
+    width: 2.7em;
+    height: 2.7em;
+  }
+
+  .zw-card-name {
+    height: 1.15em;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    word-break: break-all;
+  }
+
+  .zw-card-key,
+  .zw-wave-hint,
+  .zw-ability-text {
+    display: none !important;
+  }
+
+  .zw-root .zw-ability {
+    width: 3.8em;
+    height: 3.8em;
+  }
+
+  .zw-wave {
+    gap: 0.35em;
+    width: clamp(13.5em, 26vw, 17em);
+    padding: 0.5em;
+  }
+
+  .zw-foe-img {
+    width: 1.9em;
+    height: 1.9em;
+  }
+
+  .zw-start {
+    min-height: 2.6em;
+  }
+
+  .zw-has-tower .zw-build {
+    display: none;
+  }
+
+  .zw-tower {
+    position: fixed;
+    left: 50%;
+    bottom: var(--pad-b);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-auto-flow: column;
+    grid-template-rows: auto auto auto;
+    gap: 0.4em 0.9em;
+    width: min(39em, calc(100vw - 9.5em - var(--pad-l) - var(--pad-r)));
+    padding: 0.6em 0.7em;
+    transform: translateX(-50%);
+    animation: zw-sheet 0.2s var(--ease) both;
+  }
+
+  @keyframes zw-sheet {
+    from { opacity: 0; transform: translateX(-50%) translateY(0.8em); }
+    to { opacity: 1; transform: translateX(-50%); }
+  }
+
+  .zw-tower-head {
+    grid-column: 1;
+  }
+
+  .zw-tower-stats {
+    grid-column: 1;
+    grid-row: 2 / 4;
+  }
+
+  .zw-tower-modebox,
+  .zw-tower-record,
+  .zw-tower-actions {
+    grid-column: 2;
+  }
+
+  .zw-tower-img {
+    width: 3.2em;
+    height: 3.2em;
+  }
+
+  /* Schließen-Knopf als Plakette an der Ecke, damit er die Zielwahl nicht verdeckt. */
+  .zw-tower-close {
+    top: -0.8em;
+    right: -0.8em;
+    border-radius: 50%;
+    background: rgba(18, 22, 30, 0.92);
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.18));
+    z-index: 2;
+  }
+
+  .zw-act.zw-act-sell .zw-price {
+    grid-row: 2;
+  }
+
+  .zw-act.zw-act-sell .zw-act-sub {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  /* „Alle modernisieren“ schrumpft auf Symbol und Preis. */
+  .zw-modall-text,
+  .zw-modall-count {
+    display: none;
+  }
+
+  .zw-tower-label {
+    display: none;
+  }
+
+  .zw-root .zw-act {
+    min-height: 2.7em;
+  }
+
+  .zw-has-tower .zw-right {
+    visibility: hidden;
+  }
+
+  .zw-agecard {
+    padding: 3.2em 1em 1em;
+  }
+
+  .zw-agecard-card {
+    width: min(44em, 100%);
+    gap: 0.45em;
+    padding: 0.7em 0.9em;
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+
+  .zw-agecard-tagline {
+    display: none;
+  }
+
+  .zw-emblem-big {
+    width: 2.8em;
+    height: 2.8em;
+  }
+
+  .zw-agecard-name {
+    font-size: 1.6em;
+  }
+
+  .zw-foe-big .zw-foe-img {
+    width: 2.6em;
+    height: 2.6em;
+  }
+
+  .zw-main {
+    gap: 0.7em;
+    padding: 1em 1.2em;
+  }
+
+  .zw-title-mark {
+    display: none;
+  }
+
+  .zw-title {
+    font-size: 2.3em;
+  }
+
+  .zw-root .zw-menu-btn {
+    min-height: 2.9em;
+  }
+
+  .zw-main-foot {
+    display: none;
+  }
+
+  .zw-pick-art {
+    display: none;
+  }
+
+  .zw-result {
+    width: min(52em, 100%);
+    padding: 0.9em 1.2em 0;
+    gap: 0.6em;
+  }
+
+  .zw-result-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.35em;
+  }
+
+  .zw-result-cell {
+    grid-template-columns: 1fr;
+    padding: 0.4em 0.5em;
+  }
+
+  .zw-result-cell .zw-ic {
+    display: none;
+  }
+
+  .zw-result-cell dd {
+    white-space: nowrap;
+    font-size: 0.92em;
+  }
+}
+
+/* Sehr schmale Fenster: Punktestand weicht, damit Tempo und Menüknopf noch auf die Zeile passen. */
+@media (max-width: 480px) {
+  .zw-res-score {
+    display: none;
+  }
+
+  .zw-ctl {
+    gap: 0.15em;
+    padding: 0.2em;
+  }
+
+  .zw-ctl .zw-seg-btn {
+    padding-left: 0.55em;
+    padding-right: 0.55em;
+  }
+}
+
+/* Hochformat: Bauleiste über die ganze Breite und seitlich verschiebbar, Wellenkarte darüber. */
+@media (max-width: 720px) {
+  .zw-top {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "res ctl" "age age";
+    gap: 0.5em;
+  }
+
+  .zw-res { grid-area: res; }
+  .zw-ctl { grid-area: ctl; }
+  .zw-center { grid-area: age; }
+
+  .zw-bottom {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "left right" "mid mid";
+    gap: 0.5em;
+  }
+
+  .zw-left { grid-area: left; }
+  .zw-right { grid-area: right; }
+  .zw-mid { grid-area: mid; }
+
+  .zw-build {
+    align-self: stretch;
+    overflow-x: auto;
+    touch-action: pan-x;
+    scrollbar-width: none;
+  }
+
+  .zw-root .zw-card {
+    width: 5.9em;
+  }
+
+  .zw-ability-text {
+    display: none;
+  }
+
+  .zw-wave {
+    width: min(19em, 100%);
+  }
+
+  .zw-tower {
+    position: fixed;
+    left: var(--pad-l);
+    right: var(--pad-r);
+    bottom: var(--pad-b);
+    width: auto;
+    max-height: 70vh;
+    overflow-y: auto;
+    touch-action: pan-y;
+    z-index: 5;
+    background: var(--glass-solid);
+    animation: zw-rise 0.2s var(--ease) both;
+  }
+
+  .zw-maps,
+  .zw-diffs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zw-help {
+    columns: 1;
+  }
+
+  .zw-pick-map {
+    display: grid !important;
+    grid-template-columns: 7em 1fr;
+    column-gap: 0.8em;
+  }
+
+  .zw-pick-map .zw-pick-art {
+    grid-row: 1 / 4;
+    align-self: center;
+  }
+
+  .zw-result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zw-modal[data-screen="main"] .zw-screen {
+    justify-content: center;
+    padding-left: var(--pad-l);
+  }
+
+  .zw-agecard-foot {
+    grid-template-columns: 1fr;
+  }
+
+  .zw-agecard-go {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+/* Finger statt Maus: Ziele mindestens 44 Pixel. */
+@media (pointer: coarse) {
+  .zw-seg-btn,
+  .zw-iconbtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .zw-switch {
+    min-height: 44px;
+  }
+
+  .zw-root .zw-foe {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zw-root,
+  .zw-root *,
+  .zw-root *::before,
+  .zw-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Während der Zutatenwahl zeigt die Karte die schon vorhandenen Gaben nur mit Namen, damit das Blatt Platz hat. */
+.zw-tower-fusing .zw-gifts .zw-gift-desc,
+.zw-tower-fusing .zw-gifts .zw-gift-inert-note {
+  display: none;
+}
+
+.zw-tower-fusing .zw-gifts .zw-gift {
+  align-items: center;
+}
+
+.zw-tower-fusing .zw-gifts .zw-roledot {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+/* ===== Besondere Bauplätze ===== */
+
+/* Runde Marke in der Farbe der Art mit ihrem Symbol. */
+.zw-tilechip {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tile, #ccc) 28%, rgba(18, 22, 30, 0.6));
+  box-shadow: inset 0 0 0 1.5px var(--tile, #ccc);
+  color: var(--tile, #ccc);
+}
+
+.zw-tilechip .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+/* Schild am Feld unter dem Zeiger. Der Behälter wird per transform an die Vorderkante des Felds gesetzt. */
+.zw-tilelabel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.zw-tilelabel-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  padding: 0.45em 0.75em 0.5em 0.5em;
+  border-radius: 0.9em;
+  background: var(--glass-solid);
+  border: 1px solid color-mix(in srgb, var(--tile, #fff) 45%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 0.92em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.zw-tilelabel-in .zw-tilelabel-card {
+  animation: zw-tilelabel-fade 0.18s var(--ease) both;
+}
+
+@keyframes zw-tilelabel-fade {
+  from { opacity: 0; margin-top: -0.3em; }
+  to { opacity: 1; margin-top: 0; }
+}
+
+.zw-tilelabel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.zw-tilelabel-name {
+  font-weight: 700;
+}
+
+.zw-tilelabel-fx {
+  color: var(--muted);
+}
+
+.zw-tilelabel-gain,
+.zw-tilelabel-price {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  padding-left: 0.3em;
+  font-size: 0.94em;
+  font-variant-numeric: tabular-nums;
+}
+
+.zw-tilelabel-gain .zw-icon,
+.zw-tilelabel-price .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+.zw-tilelabel-none {
+  color: var(--muted);
+}
+
+.zw-tilelabel-price .zw-icon {
+  color: var(--gold);
+}
+
+.zw-tilelabel-price.zw-dear b {
+  color: var(--warn);
+}
+
+.zw-tilelabel-price span {
+  color: var(--muted);
+}
+
+.zw-tilelabel-price .zw-tilelabel-short {
+  color: var(--warn);
+}
+
+/* Plakette in der Turmkarte. */
+.zw-badge-tile {
+  background: color-mix(in srgb, var(--tile, #fff) 18%, transparent);
+  color: var(--text);
+}
+
+.zw-badge-tile .zw-icon {
+  color: var(--tile-text, var(--text));
+}
+
+.zw-badge-tile-fx {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.zw-badge-tile-fx::before {
+  content: "· ";
+}
+
+.zw-tower-tile .zw-badge-tile {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.4em;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.25em 0.7em 0.25em 0.5em;
+  font-size: 0.8em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tile, #fff) 35%, transparent);
+}
+
+.zw-tower-tile .zw-badge-tile-fx {
+  color: var(--text);
+}
+
+.zw-fuse-tiles {
+  color: var(--text);
+}
+
+/* ===== Neues Spiel: Kartenliste, große Vorschau, Schwierigkeit ===== */
+
+.zw-newgame {
+  width: min(64em, 100%);
+}
+
+.zw-newgame .zw-sub-body {
+  padding-top: 0.2em;
+}
+
+.zw-newgame-top {
+  display: grid;
+  grid-template-columns: minmax(15em, 19em) minmax(0, 1fr);
+  gap: 1em;
+  margin-bottom: 1em;
+}
+
+.zw-newgame-maps .zw-h3 {
+  margin-bottom: 0.4em !important;
+}
+
+.zw-maplist {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35em;
+  margin: 0;
+}
+
+.zw-root .zw-mapitem {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.7em;
+  padding: 0.3em 0.6em 0.3em 0.3em;
+  border-radius: 0.8em;
+}
+
+.zw-mapitem-art {
+  flex: none;
+  width: 4.4em;
+  border-radius: 0.5em;
+  background: var(--sink);
+}
+
+.zw-mapitem-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.zw-mapitem-name {
+  font-weight: 700;
+}
+
+.zw-mapitem-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.76em;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.zw-mapitem-record .zw-icon {
+  width: 1em;
+  height: 1em;
+  color: var(--gold);
+}
+
+.zw-map-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  min-width: 0;
+  padding: 0.7em;
+  border-radius: 1em;
+  background: var(--raise);
+}
+
+.zw-map-detail-in {
+  animation: zw-hint-fade 0.2s var(--ease) both;
+}
+
+.zw-map-detail-art {
+  display: grid;
+  place-items: center;
+  border-radius: 0.7em;
+  background: var(--sink);
+  padding: 0.2em;
+}
+
+.zw-map-detail-art .zw-mapsvg {
+  width: 100%;
+  max-height: 13.5em;
+}
+
+.zw-map-detail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.zw-map-detail-name {
+  font-family: var(--display);
+  font-size: 1.35em;
+  line-height: 1.1;
+}
+
+.zw-map-detail-desc {
+  margin: 0;
+  font-size: 0.88em;
+  color: var(--muted);
+}
+
+.zw-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em 0.9em;
+  font-size: 0.82em;
+}
+
+.zw-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 600;
+}
+
+.zw-map-legend-item .zw-tilechip {
+  width: 1.45em;
+  height: 1.45em;
+}
+
+.zw-map-legend-item small {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.zw-map-tile {
+  stroke: rgba(20, 24, 32, 0.55);
+  stroke-width: 0.1;
+}
+
+.zw-newgame .zw-diffs {
+  margin-bottom: 0.2em;
+}
+
+.zw-newgame .zw-pick-diff {
+  padding: 0.55em 0.7em;
+}
+
+/* ===== Neues Spiel: Waffen dieser Partie (Waffenpool) ===== */
+
+.zw-loadout-box {
+  margin-top: 0.7em;
+}
+
+/* Mit der Waffenwahl muss die Kartenliste etwas enger werden, damit alles bei 1280 × 800 ohne Rollen passt. */
+.zw-newgame .zw-maplist {
+  gap: 0.25em;
+}
+
+.zw-newgame .zw-mapitem-art {
+  width: 3.3em;
+}
+
+.zw-newgame .zw-root .zw-mapitem,
+.zw-root .zw-newgame .zw-mapitem {
+  padding: 0.2em 0.6em 0.2em 0.25em;
+}
+
+.zw-newgame .zw-map-detail-art .zw-mapsvg {
+  max-height: 10.5em;
+}
+
+.zw-newgame .zw-newgame-top {
+  margin-bottom: 0.7em;
+}
+
+.zw-loadout-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em 0.8em;
+  margin-bottom: 0.5em;
+}
+
+.zw-loadout-head .zw-h3 {
+  margin: 0 auto 0 0 !important;
+}
+
+.zw-loadout-mode .zw-seg-btn {
+  padding: 0.3em 0.8em;
+}
+
+.zw-root .zw-loadout-redraw {
+  min-height: 2.1em;
+  padding: 0.25em 0.8em;
+  font-size: 0.88em;
+}
+
+.zw-loadout {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.45em;
+}
+
+.zw-loadout-in {
+  animation: zw-hint-fade 0.25s var(--ease) both;
+}
+
+.zw-root .zw-loadout-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05em;
+  min-width: 0;
+  padding: 0.35em 0.3em 0.4em;
+  border-radius: 0.8em;
+  background: var(--raise);
+  border: 2px solid transparent;
+  overflow: hidden;
+  text-align: center;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.zw-root .zw-loadout-item:hover,
+.zw-root .zw-loadout-item:focus-visible {
+  background: var(--raise-2);
+  border-color: var(--role-text);
+}
+
+.zw-loadout-stripe {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 0.28em;
+  background: var(--role);
+}
+
+.zw-loadout-art {
+  position: relative;
+  display: block;
+  width: 3.6em;
+  height: 3.6em;
+}
+
+.zw-loadout-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.zw-loadout-air {
+  position: absolute;
+  top: 0.1em;
+  right: -0.5em;
+  display: grid;
+  place-items: center;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: 50%;
+  background: rgba(20, 28, 44, 0.72);
+  color: #bfe6ff;
+}
+
+.zw-loadout-air .zw-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.zw-loadout-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.86em;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zw-loadout-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.7em;
+  font-weight: 650;
+  color: var(--role-text);
+}
+
+.zw-loadout-item[style*='--weapon'] .zw-loadout-name::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: 0.3em;
+  border-radius: 50%;
+  background: var(--weapon);
+  vertical-align: 0.12em;
+}
+
+.zw-loadout-info {
+  min-height: 1.3em;
+  margin: 0.35em 0 0;
+  font-size: 0.82em;
+  color: var(--muted);
+}
+
+.zw-loadout-info b {
+  color: var(--text);
+}
+
+.zw-loadout-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em 0.8em;
+  font-size: 0.84em;
+  font-weight: 650;
+}
+
+.zw-loadout-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.zw-loadout-chip .zw-roledot {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+/* Akzentfarbe einer Waffe des Pools: Punkt in Unterzeilen (Turmkarte, Bauleiste), Rand an Rezeptsymbolen. */
+.zw-weapon-dot {
+  display: inline-block;
+  flex: none;
+  width: 0.6em;
+  height: 0.6em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  background: var(--weapon, var(--accent-text));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  vertical-align: 0.05em;
+}
+
+.zw-tower-weapon {
+  display: flex;
+  align-items: center;
+  font-size: 0.78em;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.zw-roledot.zw-roledot-weapon {
+  box-shadow: 0 0 0 2px var(--weapon);
+}
+
+.zw-bookcard-needs {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 0.8em;
+  font-weight: 650;
+  color: var(--accent-text);
+}
+
+.zw-bookcard-needs.zw-off {
+  color: var(--muted);
+}
+
+.zw-bookcard-needs .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+.zw-bookcard-off {
+  opacity: 0.72;
+}
+
+.zw-help-note {
+  margin: 0 0 0.5em;
+  font-size: 0.88em;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .zw-loadout {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-height: 560px) {
+  .zw-loadout-art {
+    width: 2.6em;
+    height: 2.6em;
+  }
+}
+
+@media (max-height: 560px) {
+  .zw-map-detail-art {
+    display: none;
+  }
+
+  .zw-newgame-top {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .zw-maplist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zw-mapitem-art {
+    width: 3.4em;
+  }
+
+  .zw-mapitem-name {
+    font-size: 0.92em;
+  }
+}
+
+@media (max-width: 720px) {
+  .zw-newgame-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zw-maplist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zw-map-detail-art {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .zw-maplist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Schild auf einem Feld eines künftigen bzw. alten Weges: kleine Spur statt Marke. */
+.zw-tilelabel-trace {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 0.35em;
+  background: color-mix(in srgb, var(--tile) 30%, transparent);
+  border: 1.5px dashed var(--tile);
+}
+
+.zw-tilelabel-trace-former {
+  border-style: dotted;
+}
+
+/* Karte „Nächste Welle“: Der Weg ändert sich nach dieser Welle bzw. diese Welle läuft auf einem neuen Weg. */
+.zw-wave-path {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: -0.2em;
+  font-size: 0.82em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.zw-wave-path .zw-icon {
+  flex: none;
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--gold);
+}
+
+.zw-wave-path-soon {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* Karte der Zeitenwende: Der Weg ändert sich (Karten mit Stufen). */
+.zw-agecard-paths {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6em;
+  padding: 0.55em 0.75em;
+  border-radius: var(--r-s);
+  background: color-mix(in srgb, var(--gold) 14%, var(--raise));
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  font-size: 0.9em;
+  line-height: 1.35;
+}
+
+.zw-agecard-paths > .zw-icon {
+  flex: none;
+  width: 1.4em;
+  height: 1.4em;
+  margin-top: 0.05em;
+  color: var(--gold);
+}
+
+.zw-agecard-paths b {
+  color: var(--gold);
+}
+
+.zw-agecard-pathhint {
+  color: var(--muted);
+  font-size: 0.94em;
+}
+
+/* Kartenvorschau: Wege späterer Stufen gestrichelt, neue Tore als offene Ringe; darunter je Stufe eine Zeile. */
+.zw-map-future {
+  fill: none;
+  stroke: #f3d58a;
+  stroke-width: 0.34;
+  stroke-dasharray: 0.55 0.45;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.zw-map-gate-future {
+  fill: none;
+  stroke: #f3d58a;
+  stroke-dasharray: 0.5 0.36;
+}
+
+.zw-map-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  font-size: 0.82em;
+  color: var(--muted);
+}
+
+.zw-map-stage {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zw-map-stage b {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.zw-map-stage-chip {
+  flex: none;
+  width: 1.3em;
+  height: 0;
+  border-top: 2px dashed #f3d58a;
+}
+
+/* ---------- Zeitgaben (Wahl nach dem Boss, Marken) und Wellen mit Eigenart ---------- */
+
+.zw-topleft {
+  justify-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4em;
+  min-width: 0;
+}
+
+.zw-boonchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+  max-width: 15em;
+  pointer-events: auto;
+}
+
+.zw-boonchip {
+  display: grid;
+  place-items: center;
+  width: 1.95em;
+  height: 1.95em;
+  border-radius: 50%;
+  color: var(--boon, var(--accent-text));
+  background: color-mix(in srgb, var(--boon, var(--accent)) 18%, rgba(18, 22, 30, 0.78));
+  border: 1px solid color-mix(in srgb, var(--boon, var(--accent)) 55%, transparent);
+  box-shadow: 0 0.15em 0.5em rgba(6, 9, 16, 0.28);
+  cursor: help;
+}
+
+.zw-boonchip .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.zw-boonchip-new {
+  animation: zw-boonchip-new 1.6s var(--ease) both;
+}
+
+@keyframes zw-boonchip-new {
+  0% { transform: scale(0.3); opacity: 0; }
+  30% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 0 0.35em color-mix(in srgb, var(--boon, var(--accent)) 35%, transparent); }
+  100% { transform: none; box-shadow: 0 0.15em 0.5em rgba(6, 9, 16, 0.28); }
+}
+
+/* Die Wahl: ein Blatt über der Bauleiste, die Insel darüber bleibt frei. */
+.zw-mid {
+  position: relative;
+}
+
+.zw-boonpick-open .zw-build {
+  visibility: hidden;
+}
+
+.zw-boonpick {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 4;
+  width: max(100%, min(44em, 100vw - 2 * 19em));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  padding: 0.75em 0.8em 0.65em;
+  background: rgba(18, 22, 30, 0.8);
+  border-radius: 1.3em;
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 2.4em color-mix(in srgb, var(--accent) 22%, transparent);
+  animation: zw-boonpick-in 0.34s var(--ease) both;
+}
+
+@keyframes zw-boonpick-in {
+  from { opacity: 0; transform: translate(-50%, 1em); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.zw-boonpick-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65em;
+}
+
+.zw-boonpick-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.3em;
+  height: 2.3em;
+  border-radius: 50%;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.zw-boonpick-mark .zw-icon {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.zw-boonpick-headtext {
+  flex: 1;
+  min-width: 0;
+}
+
+.zw-boonpick-kicker {
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.zw-boonpick-title {
+  font-family: var(--display);
+  font-size: 1.28em;
+  line-height: 1.15;
+}
+
+.zw-boonpick-agelink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  flex: none;
+  padding: 0.35em 0.6em;
+  border: 0;
+  border-radius: 1em;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.84em;
+  cursor: pointer;
+}
+
+.zw-boonpick-agelink:hover {
+  color: var(--text);
+  background: var(--raise);
+}
+
+.zw-boonpick-fold {
+  flex: none;
+  font-size: 0.86em;
+  padding: 0.45em 0.75em;
+}
+
+.zw-boonpick-fold .zw-ic {
+  transform: rotate(-90deg);
+}
+
+.zw-boonpick-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55em;
+}
+
+.zw-boon {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35em;
+  min-width: 0;
+  padding: 0.7em 0.75em 0.75em;
+  border-radius: 1em;
+  border: 1px solid color-mix(in srgb, var(--boon) 45%, transparent);
+  background:
+    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--boon) 24%, transparent), transparent 70%),
+    rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: zw-boon-in 0.4s var(--ease) both;
+  transition: transform 0.16s var(--ease), border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+@keyframes zw-boon-in {
+  from { opacity: 0; transform: translateY(0.8em) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.zw-boon:hover,
+.zw-boon:focus-visible {
+  transform: translateY(-0.2em);
+  border-color: var(--boon);
+  background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0.6em 1.4em rgba(6, 9, 16, 0.35), 0 0 0 1px var(--boon), 0 0 1.6em color-mix(in srgb, var(--boon) 30%, transparent);
+}
+
+.zw-boon:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.zw-boon-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  width: 100%;
+}
+
+.zw-boon-top .zw-kbd {
+  margin-left: auto;
+}
+
+.zw-boon-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5em;
+  height: 2.5em;
+  border-radius: 50%;
+  color: var(--boon);
+  background: color-mix(in srgb, var(--boon) 20%, rgba(10, 13, 20, 0.5));
+  border: 1px solid color-mix(in srgb, var(--boon) 50%, transparent);
+}
+
+.zw-boon-icon .zw-icon {
+  width: 1.45em;
+  height: 1.45em;
+}
+
+.zw-boon-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  min-width: 0;
+  padding: 0.15em 0.5em;
+  border-radius: 1em;
+  font-size: 0.74em;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--boon) 80%, white);
+  background: color-mix(in srgb, var(--boon) 14%, transparent);
+  white-space: nowrap;
+}
+
+.zw-boon-tag .zw-icon {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.zw-boon-name {
+  font-family: var(--display);
+  font-size: 1.22em;
+  line-height: 1.1;
+}
+
+.zw-boon-text {
+  font-size: 0.82em;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.zw-boonpick-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  font-size: 0.78em;
+  color: var(--muted);
+}
+
+/* Eingeklappt: ein Knopf über der Bauleiste. */
+.zw-boonpick-pill {
+  gap: 0.5em;
+  padding: 0.5em 0.9em;
+  border-radius: 2em;
+  color: var(--text);
+  box-shadow: var(--shadow), 0 0 0 1.5px var(--accent);
+  animation: zw-boonpick-pulse 2.4s ease-in-out infinite;
+}
+
+.zw-boonpick-pill > .zw-ic {
+  color: var(--accent-text);
+}
+
+.zw-boonpick-pilltext {
+  font-weight: 700;
+}
+
+.zw-boonpick-pillicons {
+  display: flex;
+  gap: 0.2em;
+}
+
+.zw-boonpick-pillicon {
+  display: grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  color: var(--boon);
+  background: color-mix(in srgb, var(--boon) 18%, transparent);
+}
+
+.zw-boonpick-pillicon .zw-icon {
+  width: 1em;
+  height: 1em;
+}
+
+@keyframes zw-boonpick-pulse {
+  0%, 100% { box-shadow: var(--shadow), 0 0 0 1.5px var(--accent); }
+  50% { box-shadow: var(--shadow), 0 0 0 1.5px var(--accent), 0 0 1.4em color-mix(in srgb, var(--accent) 45%, transparent); }
+}
+
+/* Startknopf, solange die Wahl offen ist: sagt, warum er nicht geht. */
+.zw-start.zw-start-boon .zw-start-label {
+  font-size: 0.94em;
+}
+
+/* Ansagen in der Farbe der Gabe oder Eigenart. */
+.zw-banner-boon,
+.zw-banner-mod {
+  box-shadow: var(--shadow), 0 0 0 1.5px color-mix(in srgb, var(--tone, var(--accent)) 60%, transparent), 0 0 1.8em color-mix(in srgb, var(--tone, var(--accent)) 28%, transparent);
+}
+
+.zw-banner-boon .zw-icon,
+.zw-banner-mod .zw-icon {
+  color: var(--tone, var(--accent-text));
+}
+
+.zw-banner-boon .zw-banner-text {
+  font-size: 1.6em;
+}
+
+/* Eigenart der laufenden Welle: kleine Marke unter dem Sonnenbogen. */
+.zw-modbadge {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.25em 0.75em 0.25em 0.5em;
+  border-radius: 2em;
+  font-size: 0.86em;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--mod) 75%, white);
+  border-color: color-mix(in srgb, var(--mod) 55%, transparent);
+  cursor: help;
+}
+
+.zw-modbadge-icon .zw-icon {
+  width: 1.15em;
+  height: 1.15em;
+  color: var(--mod);
+}
+
+/* Karte „Nächste Welle“: Eigenart in ihrer Farbe (die Wegwarnung bleibt golden und ohne Rahmen). */
+.zw-wave-mod {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.4em 0.55em;
+  border-radius: var(--r-s);
+  background: color-mix(in srgb, var(--mod) 16%, rgba(10, 13, 20, 0.35));
+  border: 1px solid color-mix(in srgb, var(--mod) 50%, transparent);
+  font-size: 0.84em;
+  line-height: 1.25;
+  cursor: help;
+}
+
+.zw-wave-mod-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  color: var(--mod);
+  background: color-mix(in srgb, var(--mod) 20%, transparent);
+}
+
+.zw-wave-mod-icon .zw-icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.zw-wave-mod-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.zw-wave-mod-name {
+  color: color-mix(in srgb, var(--mod) 70%, white);
+}
+
+.zw-wave-mod-line {
+  color: var(--muted);
+  font-size: 0.92em;
+}
+
+/* Sonnenbogen und Wellenpunkte: feiner Ring um Wellen mit Eigenart. */
+.zw-arc-mod {
+  fill: none;
+  stroke-width: 1.1;
+  opacity: 0.75;
+}
+
+.zw-agepip-mod {
+  box-shadow: 0 0 0 0.14em var(--mod);
+}
+
+/* Turmkarte: Woher eine Zahl kommt (Zeitgabe oder Eigenart der Welle). */
+.zw-stat-src {
+  display: inline-grid;
+  place-items: center;
+  margin-left: 0.3em;
+  vertical-align: -0.15em;
+  color: var(--src);
+}
+
+.zw-stat-src .zw-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.zw-tower-src {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35em;
+  margin-top: 0.35em;
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.zw-tower-src-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0.1em 0.5em 0.1em 0.3em;
+  border-radius: 1em;
+  color: color-mix(in srgb, var(--src) 75%, white);
+  background: color-mix(in srgb, var(--src) 14%, transparent);
+  cursor: help;
+}
+
+.zw-tower-src-item .zw-icon {
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--src);
+}
+
+/* Ergebnis- und Pausenbildschirm: gewählte Zeitgaben. */
+.zw-boonlist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em 0.6em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zw-boonlist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.2em 0.7em 0.2em 0.2em;
+  border-radius: 2em;
+  background: var(--raise);
+  font-size: 0.88em;
+  cursor: help;
+}
+
+.zw-boonlist-item .zw-boonchip {
+  width: 1.8em;
+  height: 1.8em;
+  cursor: inherit;
+}
+
+.zw-boonlist-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  white-space: nowrap;
+}
+
+.zw-boonlist-tag {
+  font-size: 0.86em;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .zw-topleft { grid-area: res; }
+
+  .zw-boonpick {
+    position: fixed;
+    left: var(--pad-l);
+    right: var(--pad-r);
+    bottom: var(--pad-b);
+    width: auto;
+    max-height: 72vh;
+    overflow-y: auto;
+    transform: none;
+    animation-name: zw-rise;
+  }
+
+  .zw-boonpick-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zw-boon {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "icon name" "icon text";
+    column-gap: 0.7em;
+    row-gap: 0.15em;
+  }
+
+  .zw-boon-top {
+    display: contents;
+  }
+
+  .zw-boon-icon { grid-area: icon; align-self: start; }
+  .zw-boon-name { grid-area: name; }
+  .zw-boon-text { grid-area: text; }
+
+  .zw-boon-tag {
+    position: absolute;
+    top: 0.6em;
+    right: 0.6em;
+  }
+
+  .zw-boon .zw-kbd {
+    display: none;
+  }
+
+  .zw-boonpick-agelink > span:not(.zw-ic),
+  .zw-boonpick-foot {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zw-boonpick,
+  .zw-boon,
+  .zw-boonchip-new,
+  .zw-boonpick-pill {
+    animation: none;
+  }
+}
+
+.zw-boonsect {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+}
+
+.zw-boonsect-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.zw-boonsect-head .zw-icon {
+  width: 1.2em;
+  height: 1.2em;
+  color: var(--accent-text);
+}
+
+/* ===== Rezepte: Formel, Verschmelzen-Blatt, Ansage, Bauplan-Karte, Rezeptbuch ===== */
+
+/* Formel: Kern + Zutaten als Rollensymbole. */
+.zw-formula {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22em;
+  flex: none;
+}
+
+.zw-formula .zw-roledot {
+  width: 1.55em;
+  height: 1.55em;
+}
+
+.zw-formula .zw-roledot .zw-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.zw-formula .zw-formula-core {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+.zw-formula-plus {
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0 0.05em;
+}
+
+.zw-formula .zw-formula-unknown {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Rezept-Zeilen im Verschmelzen-Blatt */
+.zw-fuse-recipe {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3em;
+}
+
+.zw-fuse-recipe-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.zw-fuse-recipe-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+.zw-fuse-recipe-text b {
+  font-weight: 700;
+}
+
+.zw-fuse-recipe-off {
+  color: var(--muted);
+}
+
+.zw-fuse-recipe-off .zw-formula {
+  opacity: 0.7;
+}
+
+.zw-fuse-recipe.zw-fuse-recipe-locked {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.zw-fuse-recipe-locked b {
+  color: var(--warn);
+}
+
+/* Ansage: neues Rezept */
+.zw-banner-recipe {
+  border-radius: 1.2em;
+  padding: 0.55em 1.2em 0.6em;
+  box-shadow: var(--shadow), 0 0 0 1.5px rgba(232, 180, 216, 0.5), 0 0 1.8em rgba(232, 180, 216, 0.25);
+}
+
+.zw-banner-recipe > .zw-icon {
+  width: 1.7em;
+  height: 1.7em;
+  color: #e8b4d8;
+}
+
+.zw-banner-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15em;
+}
+
+.zw-banner-kicker {
+  font-size: 0.74em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e8b4d8;
+}
+
+.zw-banner-recipe .zw-banner-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.zw-banner-new {
+  color: var(--gold);
+  font-weight: 650;
+}
+
+/* Bauplan in der Wahl der Zeitgabe */
+.zw-boon-formula {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em 0.55em;
+  padding: 0.3em 0.5em;
+  border-radius: var(--r-s);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.86em;
+}
+
+.zw-boon-formula-text b {
+  color: var(--boon);
+}
+
+.zw-boon-new {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0 0.5em;
+  border-radius: 1em;
+  background: rgba(246, 203, 92, 0.18);
+  color: var(--gold);
+  font-size: 0.9em;
+  font-weight: 650;
+}
+
+@media (max-width: 720px) {
+  .zw-boon-recipe {
+    grid-template-areas: "icon name" "icon formula" "icon text";
+  }
+
+  .zw-boon-formula { grid-area: formula; justify-self: start; }
+}
+
+/* Kurze Liste der freigeschalteten Rezepte (Pause, Ergebnis) */
+.zw-recipelist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em 0.6em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zw-recipelist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.2em 0.75em 0.2em 0.25em;
+  border-radius: 2em;
+  background: var(--raise);
+  font-size: 0.88em;
+  cursor: help;
+}
+
+.zw-recipelist-item .zw-formula {
+  font-size: 0.85em;
+}
+
+.zw-recipelist-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  white-space: nowrap;
+}
+
+.zw-recipelist-tag {
+  font-size: 0.86em;
+  color: var(--muted);
+}
+
+/* Rezeptbuch */
+.zw-book-intro {
+  margin: 0 0 0.9em;
+  color: var(--muted);
+  font-size: 0.9em;
+  line-height: 1.45;
+}
+
+.zw-book-count {
+  color: var(--gold);
+}
+
+.zw-book {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15.5em, 1fr));
+  gap: 0.7em;
+}
+
+.zw-bookcard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  padding: 0.75em 0.85em 0.8em;
+  border-radius: 1em;
+  border: 1px solid color-mix(in srgb, var(--role) 40%, transparent);
+  background:
+    radial-gradient(110% 70% at 0% 0%, color-mix(in srgb, var(--role) 20%, transparent), transparent 70%),
+    rgba(255, 255, 255, 0.05);
+}
+
+.zw-bookcard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+}
+
+.zw-bookcard-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  font-size: 0.74em;
+  color: var(--good);
+  white-space: nowrap;
+}
+
+.zw-bookcard-flag .zw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.zw-bookcard-name {
+  margin: 0.1em 0 0;
+  font-family: var(--display);
+  font-size: 1.2em;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.zw-bookcard-mix {
+  font-size: 0.82em;
+  font-weight: 650;
+  color: var(--role-text);
+}
+
+.zw-bookcard-text {
+  margin: 0;
+  font-size: 0.82em;
+  line-height: 1.38;
+  color: var(--muted);
+}
+
+.zw-bookcard-foot {
+  margin-top: auto;
+  padding-top: 0.25em;
+  font-size: 0.76em;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.zw-bookcard-unknown {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.zw-bookcard-unknown .zw-bookcard-name {
+  color: var(--muted);
+}
+
+.zw-bookcard-unknown .zw-formula-core {
+  filter: saturate(0.5) brightness(0.85);
+}
+
+@media (max-width: 720px) {
+  .zw-book {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

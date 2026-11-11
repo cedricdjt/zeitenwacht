@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Oberfläche – Testseite</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/ui.css">
+<style>
+  /* Kulisse hinter dem Glas: sehr hell, sehr dunkel oder ein Bild. */
+  #backdrop { position: fixed; inset: 0; background-size: cover; background-position: center; }
+  #backdrop.light { background:
+    radial-gradient(60% 40% at 50% 62%, #f3e7c4 0%, rgba(243, 231, 196, 0) 70%),
+    linear-gradient(180deg, #fdf6ee 0%, #f7e3d3 30%, #dfeecb 52%, #b9dc98 100%); }
+  #backdrop.dark { background:
+    radial-gradient(50% 35% at 50% 60%, #24406a 0%, rgba(36, 64, 106, 0) 70%),
+    linear-gradient(180deg, #070b1c 0%, #0e1433 45%, #14263a 100%); }
+  #backdrop.white { background: #ffffff; }
+  #backdrop.mid { background: linear-gradient(180deg, #4fa3e3 0%, #cfebfa 45%, #b9c46a 55%, #a6b35a 100%); }
+  #iconsheet { position: fixed; inset: 0; overflow: auto; padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; align-content: start; background: #1b2230; touch-action: pan-y; }
+  #iconsheet figure { margin: 0; padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); text-align: center; font: 11px system-ui; color: #c9ced8; }
+  #iconsheet .zw-icon { width: 36px; height: 36px; margin: 0 auto 6px; color: #f5f1e9; }
+</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<div id="backdrop"></div>
+<div id="ui"></div>
+<script type="module">
+// Testseite der Oberfläche: erreicht jeden Bildschirm und Zustand über Parameter, ohne zu spielen.
+//   ?screen=menu|maps|settings|help|game|pause|result|age|icons
+//   age=<Index> wave=running|idle waveInAge=<0..9> gold=<n> lives=<n> score=<n> build=<Rolle> select=1 tier=<n> level=<1..3>
+//   towers=<n> armed=1 won=1|0 bg=light|dark|white|mid|<Bildpfad> map=<Kennung> diff=easy|normal|hard
+//   tutorial=1 (Hinweise an) save=1 records=1 boss=1 hover=upgrade|modernize tip=<Kartenindex>|foe|ability
+//   fusion=few|pick|ready|super (Kern mit Nachbarn auf Stufe 3) core=<Rolle> branch=0|1 gifts=<Rolle,Rolle>
+//   toast=1 banner=1 paused=1 speed=<1|2|4> lowfx=1 run=1 (Simulation läuft) steps=<n> long=1 (lange Namen)
+import { content } from '../src/content/index.js';
+import { createSim, SIM_DT } from '../src/sim/sim.js';
+import { towerStats } from '../src/sim/rules.js';
+import { createThumbnailer } from '../src/render/thumbnails.js';
+import { createUi } from '../src/ui/ui.js';
+import { iconSvg, listIcons } from '../src/ui/icons.js';
+import { REJECT_TEXT } from '../src/ui/texts.js';
+import { createFusionControl } from '../src/game/fusion.js';
+import { addToRecipeBook, loadRecipeBook } from '../src/game/recipebook.js';
+
+const q = new URLSearchParams(location.search);
+const int = (name, fallback) => (q.has(name) ? parseInt(q.get(name), 10) : fallback);
+const screen = q.get('screen') || 'game';
+
+const backdrop = document.getElementById('backdrop');
+const bg = q.get('bg') || 'mid';
+if (['light', 'dark', 'white', 'mid'].includes(bg)) backdrop.className = bg;
+else backdrop.style.backgroundImage = `url("${bg}")`;
+
+if (screen === 'icons') {
+  const sheet = document.createElement('div');
+  sheet.id = 'iconsheet';
+  for (const name of [...listIcons(), 'gibt-es-nicht']) {
+    const f = document.createElement('figure');
+    f.innerHTML = iconSvg(name) + name;
+    sheet.append(f);
+  }
+  document.body.append(sheet);
+  window.__ready = true;
+} else {
+  start();
+}
+
+function start() {
+  const thumbs = createThumbnailer();
+  const settings = {
+    quality: q.has('lowfx') ? 'low' : 'auto', masterVolume: 0.8, sfxVolume: 0.7, musicVolume: 0.5, muted: false, shake: true,
+    autoStart: q.has('auto'), floatingText: false, tutorialDone: !q.has('tutorial'),
+  };
+  if (q.has('long')) {
+    // Härtetest für lange Namen.
+    content.archetypes[2].tiers.forEach((t) => { if (t) t.name = 'Donaudampfschifffahrtsklebeschaumwerfer'; });
+    content.ages.forEach((a) => { a.name = 'Zeitalter der überaus langen Namen'; });
+  }
+  const mapId = q.get('map') || content.maps[0].id;
+  const difficulty = q.get('diff') || 'normal';
+  let sim = createSim({ content, mapId, difficulty, seed: 7, unlockAll: q.has('unlock') || settings.tutorialDone, boonChoice: true });
+  const view = { sim, content, settings, speed: int('speed', 1), paused: q.has('paused'), buildArch: null, selected: null, abilityArmed: false, hover: null, fusion: null };
+  const log = [];
+  const say = (result) => { if (result && !result.ok) ui.toast(REJECT_TEXT[result.reason] || 'Das geht gerade nicht', 'warn'); return result; };
+  const actions = {
+    newGame: (m, d) => { log.push(`newGame ${m} ${d}`); ui.toast(`Neue Partie: ${m}, ${d}`, 'good'); },
+    continueGame: () => { log.push('continue'); ui.showGame(view); },
+    restart: () => { log.push('restart'); ui.showGame(view); },
+    quitToMenu: () => { log.push('quit'); ui.showMenu(menuInfo()); },
+    setPaused: (p) => { view.paused = p; },
+    setSpeed: (s) => { view.speed = s; },
+    startWave: () => { say(view.sim.startWave()); },
+    chooseBuild: (id) => { view.buildArch = id; view.selected = null; },
+    selectTower: (id) => { view.selected = id === null ? null : view.sim.towerById(id); },
+    upgrade: (id, branch) => {
+      const t = view.sim.towerById(id);
+      if (t && t.level === 2 && t.arch.branches && branch === undefined) { ui.toast(REJECT_TEXT.branch, 'warn'); return; }
+      say(view.sim.upgrade(id, branch));
+    },
+    fuseBegin: (id) => { view.selected = view.sim.towerById(id); fusion.begin(id); },
+    fuseToggle: (id) => { fusion.toggle(id); },
+    fuseCancel: () => { fusion.cancel(); },
+    fuseConfirm: () => { fusion.confirm(); },
+    chooseBoon: (id) => { say(view.sim.chooseBoon(id)); },
+    modernize: (id) => { say(view.sim.modernize(id)); },
+    modernizeAll: () => { for (const t of [...view.sim.state.towers].sort((a, b) => view.sim.modernizeCost(a) - view.sim.modernizeCost(b))) view.sim.modernize(t.id); },
+    sell: (id) => { if (say(view.sim.sell(id)).ok) view.selected = null; },
+    setTargetMode: (id, mode) => { view.sim.setTargetMode(id, mode); },
+    armAbility: (armed) => { if (armed && view.sim.ability().radius === 0) say(view.sim.useAbility(0, 0)); else view.abilityArmed = armed; },
+    changeSettings: (patch) => { Object.assign(settings, patch); log.push('settings ' + JSON.stringify(patch)); },
+    resetCamera: () => { log.push('resetCamera'); },
+    recipeBook: () => recipeBook,
+    discoverRecipe: (id, how) => addToRecipeBook(recipeBook, id, how, view.sim.state.age),
+  };
+  const recipeBook = loadRecipeBook();
+  const project = (x, y, z, out) => {
+    out.x = innerWidth / 2 + x * 44;
+    out.y = innerHeight / 2 + z * 30 - y * 30;
+    out.visible = true;
+  };
+  const fusion = createFusionControl({ sim: () => view.sim, view: () => view, reject: (r) => ui.toast(REJECT_TEXT[r ?? 'unknown'], 'warn') });
+  const ui = createUi({ root: document.getElementById('ui'), content, actions, settings, thumbnail: (id, opts) => thumbs.render(id, opts), project });
+  window.__ui = ui;
+  window.__view = view;
+  window.__log = log;
+
+  const menuInfo = () => ({
+    save: q.has('save') ? { mapId: content.maps[1].id, difficulty: 'easy', wave: 13, totalWaves: sim.totalWaves, ageName: content.ages[content.ages.length - 1].name } : null,
+    records: q.has('records') ? { [`${content.maps[0].id}:normal`]: { score: 48250, wave: sim.totalWaves, won: true }, [`${content.maps[1].id}:normal`]: { score: 9120, wave: 14, won: false } } : {},
+  });
+
+  // ----- Zustand der Partie herbeiführen -----
+  const st = sim.state;
+  const age = Math.min(int('age', 0), content.ages.length - 1);
+  const free = [];
+  for (let tz = 0; tz < sim.map.height; tz++) for (let tx = 0; tx < sim.map.width; tx++) if (sim.canBuild(tx, tz).ok) free.push([tx, tz]);
+  // gut verteilte Plätze: jedes siebte freie Feld
+  const spots = free.filter((_, i) => i % 7 === 3);
+  st.gold = 1e7;
+  const count = int('towers', q.has('select') ? 4 : 0);
+  for (let i = 0; i < count && i < spots.length; i++) {
+    const arch = content.archetypes[i % content.archetypes.length];
+    const r = sim.build(arch.id, spots[i][0], spots[i][1]);
+    if (!r.ok) console.warn('Bau abgelehnt', arch.id, r.reason);
+  }
+  sim.drainEvents();
+  const waveInAge = Math.min(int('waveInAge', q.has('boss') ? content.waves[age].length - 1 : 0), content.waves[age].length - 1);
+  st.age = age;
+  st.waveInAge = waveInAge;
+  st.wave = content.waves.slice(0, age).reduce((n, w) => n + w.length, 0) + waveInAge;
+  if (q.has('lastwave')) { st.age = content.ages.length - 1; st.waveInAge = content.waves[st.age].length - 1; st.wave = sim.totalWaves - 1; }
+  const tier = Math.min(int('tier', Math.max(0, st.age - (q.has('select') ? 1 : 0))), st.age);
+  const level = Math.min(3, Math.max(1, int('level', 1)));
+  st.towers.forEach((t, i) => {
+    t.tier = i === 0 ? tier : Math.max(0, st.age - (i % 3));
+    t.level = i === 0 ? level : 1 + (i % 3);
+    t.stats = towerStats(content, t.arch, t.tier, t.level);
+    t.kills = 37 * (i + 1);
+    t.damageDealt = 12840.4 * (i + 1);
+    t.builtWave = q.has('fresh') ? st.wave : -1;
+  });
+  if (q.has('buff') && st.towers[0]) st.towers[0].buffRate = 0.26;
+  st.gold = int('gold', 340);
+  st.lives = int('lives', st.maxLives - 3);
+  st.score = int('score', 12480);
+  if (q.has('cd')) st.abilityCooldown = int('cd', 32);
+  if (q.get('wave') === 'running' || q.has('boss')) {
+    sim.startWave();
+    const steps = int('steps', q.has('boss') ? 4000 : 420);
+    for (let i = 0; i < steps; i++) {
+      sim.step();
+      if (q.has('boss') && st.enemies.some((e) => e.def.boss)) { for (let k = 0; k < 200; k++) sim.step(); break; }
+      if (st.phase !== 'wave') break;
+    }
+    sim.drainEvents();
+    st.gold = int('gold', 340);
+    st.lives = int('lives', st.maxLives - 3);
+  }
+  if (q.has('fusion')) setupFusion(q.get('fusion'));
+  if (q.has('won')) st.phase = q.get('won') === '1' ? 'won' : 'lost';
+  if (q.has('select') && st.towers[0]) view.selected = st.towers[0];
+  if (q.has('build')) view.buildArch = q.get('build');
+  if (q.has('armed')) view.abilityArmed = true;
+
+  const result = () => ({
+    won: q.get('won') === '1', score: int('score', 48250), best: int('best', 39800), newRecord: q.has('record') || q.get('won') === '1',
+    wave: q.get('won') === '1' ? sim.totalWaves : 14, totalWaves: sim.totalWaves, ageName: content.ages[q.get('won') === '1' ? content.ages.length - 1 : Math.min(1, content.ages.length - 1)].name, time: 2412,
+    stats: { fusions: 3, kills: 1843, leaks: 9, goldEarned: 128450, goldSpent: 121900, towersBuilt: 31, towersSold: 4, upgrades: 44, modernizations: 52, damageDealt: 2384120, abilitiesUsed: 11, perfectWaves: 27 },
+  });
+
+  switch (screen) {
+    case 'menu': ui.showMenu(menuInfo()); break;
+    case 'maps': ui.showMenu(menuInfo()); clickText('Neues Spiel'); break;
+    case 'settings': ui.showMenu(menuInfo()); clickText('Einstellungen'); break;
+    case 'help': ui.showMenu(menuInfo()); clickText('Anleitung'); break;
+    case 'pause': ui.showGame(view); document.querySelector('.zw-menubtn').click(); if (q.has('confirm')) clickText('Neu starten'); break;
+    case 'result': if (!q.has('won')) st.phase = 'lost'; ui.showGame(view); ui.showResult(result()); break;
+    case 'age': ui.showGame(view); ui.handleEvents([{ type: 'age', from: Math.max(0, st.age - 1), to: st.age, gift: 16 * 9 }]); st.lock = q.has('run') ? 5 : 1e9; break;
+    default: ui.showGame(view); break;
+  }
+  if (q.has('toast')) { ui.toast('Zu wenig Gold', 'warn'); ui.toast('Hier kann nicht gebaut werden', 'warn'); ui.toast('Spielstand gespeichert', 'good'); }
+  if (q.has('banner')) ui.handleEvents([{ type: 'waveStart', wave: st.wave, age: st.age, waveInAge: st.waveInAge, boss: q.has('boss'), early: 12 }, { type: 'waveClear', wave: st.wave, bonus: 72, perfect: true }]);
+  if (q.has('leak')) setTimeout(() => ui.handleEvents([{ type: 'leak', enemy: null, lives: 1 }]), 300);
+
+  /** Kern und Nachbarn auf Stufe 3 bauen; je nach Fall verschmelzen oder die Auswahl öffnen. */
+  function setupFusion(kind) {
+    const keep = st.gold;
+    st.gold = 1e7;
+    const around = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+    let spot = null;
+    for (let tz = 1; tz < sim.map.height - 1 && !spot; tz++) {
+      for (let tx = 1; tx < sim.map.width - 1 && !spot; tx++) {
+        if (!sim.canBuild(tx, tz).ok) continue;
+        const ok = around.filter(([dx, dz]) => sim.canBuild(tx + dx, tz + dz).ok);
+        if (ok.length >= 4) spot = { tx, tz, ok };
+      }
+    }
+    if (!spot) { console.warn('Kein Platz für das Verschmelzen'); return; }
+    const coreArch = q.get('core') || content.archetypes[0].id;
+    const giftArchs = (q.get('gifts') || 'knacker,brenner,werfer').split(',');
+    const raise = (t, branch) => { while (t.level < 3) sim.upgrade(t.id, t.level === 2 ? branch : undefined); };
+    sim.build(coreArch, spot.tx, spot.tz);
+    const core = sim.towerAt(spot.tx, spot.tz);
+    raise(core, int('branch', 0));
+    const n = kind === 'few' ? 2 : kind === 'pick' ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const [dx, dz] = spot.ok[i];
+      sim.build(giftArchs[i % giftArchs.length], spot.tx + dx, spot.tz + dz);
+      const t = sim.towerAt(spot.tx + dx, spot.tz + dz);
+      if (kind === 'few' && i === 1) sim.upgrade(t.id); else raise(t, i % 2);
+    }
+    sim.drainEvents();
+    st.gold = keep;
+    view.selected = core;
+    if (kind === 'super') { const r = sim.fuse(core.id, sim.fuseCandidates(core.id).map((t) => t.id)); if (!r.ok) console.warn('fuse', r.reason); sim.drainEvents(); }
+    if (kind === 'pick' || kind === 'ready') actions.fuseBegin(core.id);
+    window.__core = core;
+  }
+  function clickText(text) {
+    const b = [...document.querySelectorAll('.zw-modal button')].find((n) => n.textContent.includes(text));
+    if (b) b.click();
+  }
+  /** Simuliert das Überfahren mit der Maus. */
+  function hover(node) {
+    if (node) node.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+  }
+
+  let last = performance.now();
+  let stock = 0;
+  let frames = 0;
+  function frame(now) {
+    const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
+    last = now;
+    if (q.has('run') && !view.paused && !ui.modal) {
+      stock += dt * view.speed;
+      let n = 0;
+      while (stock >= SIM_DT && n++ < 12) {
+        sim.step();
+        ui.handleEvents(sim.drainEvents());
+        stock -= SIM_DT;
+      }
+      if (view.selected && !sim.towerById(view.selected.id)) view.selected = null;
+    }
+    ui.update(dt);
+    frames += 1;
+    if (frames === 3) {
+      if (q.get('hover') === 'upgrade') hover(document.querySelector('.zw-act-up'));
+      if (q.get('hover') === 'modernize') hover(document.querySelector('.zw-act-mod'));
+      if (q.get('tip') === 'foe') hover(document.querySelector('.zw-foe'));
+      else if (q.get('tip') === 'ability') hover(document.querySelector('.zw-ability'));
+      else if (q.has('tip')) hover(document.querySelectorAll('.zw-card')[int('tip', 0)]);
+    }
+    if (frames === 30) finish();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  async function finish() {
+    await Promise.all([...document.images].filter((i) => i.src).map((i) => i.decode().catch(() => {})));
+    // Zählt DOM-Änderungen von 240 update()-Aufrufen bei unverändertem Zustand.
+    window.__countIdleWrites = () => {
+      const obs = new MutationObserver(() => {});
+      obs.observe(document.getElementById('ui'), { subtree: true, childList: true, attributes: true, characterData: true });
+      for (let i = 0; i < 240; i++) ui.update(1 / 60);
+      const n = obs.takeRecords().length;
+      obs.disconnect();
+      return n;
+    };
+    window.__ready = true;
+  }
+}
+</script>
+</body>
+</html>

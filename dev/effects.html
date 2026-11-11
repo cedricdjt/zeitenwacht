@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Effekte-Test</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe6f2; font: 12px system-ui, sans-serif; }
+  canvas { display: block; }
+  #panel { position: fixed; left: 8px; top: 8px; width: 250px; max-height: calc(100% - 16px); overflow: auto; background: rgba(20, 28, 38, .78); color: #fff; border-radius: 10px; padding: 8px; }
+  #panel h4 { margin: 6px 0 3px; font-size: 11px; opacity: .7; font-weight: 600; }
+  #panel button { margin: 1px; padding: 2px 6px; font: inherit; border: 0; border-radius: 6px; background: #3b4a5c; color: #fff; cursor: pointer; }
+  #panel button:hover { background: #56708c; }
+  #info { position: fixed; right: 8px; bottom: 8px; background: rgba(20, 28, 38, .78); color: #fff; border-radius: 8px; padding: 4px 8px; white-space: pre; }
+  .hidden { display: none; }
+</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<div id="panel"></div>
+<div id="info"></div>
+<script type="module">
+// Testseite der Effektschicht. Die Simulation, die Figurenschicht und die Welt sind hier schlichte Attrappen,
+// damit die Seite unabhängig vom Stand der übrigen Teile läuft.
+//
+// URL-Parameter:
+//   fx=<name>&t=0.2   löst den Effekt aus und friert das Bild t Sekunden danach ein (reproduzierbare Screenshots)
+//   all=1             lässt alle Effekte fortlaufend spielen          speed=1|2|4   Spieltempo
+//   stress=1          Lasttest: 300 Geschosse, Dauerfeuer an Einschlägen und Siegen bei vierfachem Tempo
+//   zoom=1            größer = näher (1 = Spielentfernung, ein Feld ist etwa 60 Pixel breit)
+//   post=0            ohne Bloom (wie die mittlere und niedrige Grafikstufe)
+//   night=1           Nachtlicht (wie die Zukunft)      quality=high|medium|low      ui=0  ohne Bedienfeld
+//   look=x,z          Blickziel der Kamera in Feldern
+//   fx=a,b&ts=0.1,0.4&cols=2   Kontaktbogen: mehrere Effekte und Zeitpunkte in einem Bild, umbrochen nach `cols` Spalten
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { getModel } from '../src/content/models.js';
+import { createEffectLayer } from '../src/render/effects.js';
+import { InstancedModel, makeAnimCtx } from '../src/render/instances.js';
+import { CAMERA_AZIMUTH, CAMERA_ELEVATION, CAMERA_FOV, FLY_HEIGHT, PATH_DEPTH } from '../src/render/layout.js';
+import { LightRig, NEUTRAL_LIGHT, SkyDome, configureRenderer, createMaterials } from '../src/render/look.js';
+import { PostFx } from '../src/render/post.js';
+import { Terrain } from '../src/render/terrain.js';
+
+const q = new URLSearchParams(location.search);
+const num = (key, fallback) => (q.has(key) && q.get(key) !== '' ? Number(q.get(key)) : fallback);
+const frozen = q.has('fx') && (q.has('t') || q.has('ts'));
+const SIM_DT = 1 / 60;
+// Kontaktbogen: mehrere Effekte (Zeilen) zu mehreren Zeitpunkten (Spalten) in einem Bild.
+const sheetFx = frozen ? q.get('fx').split(',') : [];
+const sheetTs = frozen ? (q.get('ts') ?? q.get('t')).split(',').map(Number) : [];
+const sheetCols = frozen ? Math.min(sheetFx.length * sheetTs.length, Number(q.get('cols') ?? sheetTs.length)) : 1;
+const VIEW_W = frozen ? Math.floor(innerWidth / sheetCols) : innerWidth;
+const VIEW_H = frozen ? Math.floor(innerHeight / Math.ceil((sheetFx.length * sheetTs.length) / sheetCols)) : innerHeight;
+
+// Reproduzierbarer Zufall für eingefrorene Bilder.
+let randomState = 7;
+if (frozen) {
+  Math.random = () => {
+    let s = randomState;
+    s = randomState = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// --- Bühne ---
+const W = 14, H = 9;
+const PATH_ROW = 4;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(VIEW_W, VIEW_H);
+configureRenderer(renderer);
+renderer.info.autoReset = false; // mit Bloom zeichnet der Renderer mehrmals je Bild; die Zähler sollen das ganze Bild erfassen
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const night = q.get('night') === '1';
+const theme = night
+  ? { ...NEUTRAL_LIGHT, skyTop: '#0b1026', skyHorizon: '#27345e', skyBottom: '#101632', sunColor: '#9db8ff', sunIntensity: 1.0, hemiSky: '#7f96d8', hemiGround: '#3b4360', hemiIntensity: 1.5, fillIntensity: 0.3, sunGlow: 0.6, fogColor: '#27345e' }
+  : NEUTRAL_LIGHT;
+const rig = new LightRig(scene, { radius: 14 });
+rig.apply(theme);
+const sky = new SkyDome();
+sky.apply(theme);
+scene.add(sky.mesh);
+scene.fog = new THREE.FogExp2(new THREE.Color(theme.fogColor).getHex(), 0.004);
+const materials = createMaterials();
+const terrain = new Terrain({ width: W, height: H, isPath: (x, z) => z === PATH_ROW && x >= -3 && x <= W - 2, isSolid: (x, z) => Math.abs(x - W) <= 1.5 && Math.abs(z - PATH_ROW) <= 1, seed: 5 }, materials.matte);
+terrain.setPalette(night
+  ? { groundA: '#3d5a66', groundB: '#35505c', path: '#56616e', pathEdge: '#7f8c99', soil: '#3a3540', rock: '#4b5060' }
+  : { groundA: '#8cc56a', groundB: '#74b45c', path: '#d9c08f', pathEdge: '#b89a68', soil: '#9a6e45', rock: '#8a8f98' });
+scene.add(terrain.mesh);
+
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV, VIEW_W / VIEW_H, 1, 600);
+const az = num('camaz', CAMERA_AZIMUTH) * Math.PI / 180, el = num('camel', CAMERA_ELEVATION) * Math.PI / 180, dist = 26 / num('zoom', 1);
+const look = (q.get('look') ?? '0,0').split(',').map(Number);
+camera.position.set(look[0] + Math.sin(az) * Math.cos(el) * dist, Math.sin(el) * dist, look[1] + Math.cos(az) * Math.cos(el) * dist);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(look[0], 0, look[1]);
+controls.update();
+const post = q.get('post') === '0' ? null : new PostFx(renderer, scene, camera);
+
+const tileX = (tx) => tx - W / 2 + 0.5;
+const tileZ = (tz) => tz - H / 2 + 0.5;
+const PATH_Z = tileZ(PATH_ROW);
+
+// --- Attrappen: Rollen, Türme, Gegner, Simulation, Welt, Figurenschicht ---
+const ROLE = { schuetze: '#3f7fd9', werfer: '#f08a2e', bremser: '#2fb8a6', knacker: '#8e5bd0', brenner: '#e0483a', takt: '#f2c230' };
+const BASE_STATS = { attack: 'projectile', damage: 10, cooldown: 1, range: 3.5, minRange: 0, projectileSpeed: 9, splash: 0, slow: 0, slowDuration: 0, dot: 0, dotDuration: 0, pierce: 0, chain: 0, chainRange: 0, zone: 0, ramp: 0 };
+/** Legt eine Rolle mit genau einer Ausprägung an. */
+function arch(role, stats, shot) {
+  return { id: role, role, color: ROLE[role], stats: { ...BASE_STATS, ...stats }, tiers: [{ name: role, model: 'example.slinger', shot: { sound: 'none', ...shot } }] };
+}
+const ARCHS = {
+  kiesel: arch('schuetze', {}, { kind: 'model', model: 'shot.kiesel', color: '#9A968F', arc: 0.3, tumble: true, impact: 'dust' }),
+  pfeil: arch('schuetze', { projectileSpeed: 11 }, { kind: 'model', model: 'shot.pfeil', color: '#F4F1E6', arc: 0.1, impact: 'dust' }),
+  bolzen: arch('schuetze', { projectileSpeed: 12 }, { kind: 'model', model: 'shot.bolzen', color: '#E9E4DA', arc: 0, impact: 'dust' }),
+  muskete: arch('schuetze', { attack: 'hitscan' }, { kind: 'tracer', color: '#CFE2FF', muzzle: 'smoke', impact: 'spark' }),
+  kurbel: arch('schuetze', { attack: 'hitscan', cooldown: 0.25 }, { kind: 'tracer', color: '#FFE27A', muzzle: 'flash', impact: 'spark' }),
+  laser: arch('schuetze', { attack: 'hitscan' }, { kind: 'beam', color: '#5AA8FF', muzzle: 'energy', impact: 'energy' }),
+  dauerstrahl: arch('schuetze', { attack: 'beam', cooldown: 0.1 }, { kind: 'beam', color: '#5AA8FF', muzzle: 'energy', impact: 'energy' }),
+  felsbrocken: arch('werfer', { projectileSpeed: 5, splash: 1 }, { kind: 'model', model: 'shot.felsbrocken', color: '#8F8B84', arc: 1.6, tumble: true, impact: 'dust' }),
+  tontopf: arch('werfer', { projectileSpeed: 5, splash: 1 }, { kind: 'model', model: 'shot.tontopf', color: '#C9773F', arc: 1.4, tumble: true, impact: 'dust' }),
+  steinkugel: arch('werfer', { projectileSpeed: 5, splash: 1.2 }, { kind: 'model', model: 'shot.steinkugel', color: '#9A958C', arc: 2.2, tumble: true, impact: 'dust' }),
+  bombe: arch('werfer', { projectileSpeed: 5, splash: 1.2 }, { kind: 'model', model: 'shot.bombe', color: '#FF9A3C', arc: 2, tumble: true, trail: 'spark', muzzle: 'smoke', impact: 'explosion' }),
+  rakete: arch('werfer', { projectileSpeed: 6, splash: 1.3 }, { kind: 'model', model: 'shot.rakete', color: '#FF8A3C', arc: 0.8, trail: 'smoke', muzzle: 'flash', impact: 'explosion' }),
+  klecks: arch('bremser', { projectileSpeed: 6, splash: 0.9, zone: 3 }, { kind: 'model', model: 'shot.klecks', color: '#E0A030', arc: 1.3, impact: 'splash' }),
+  pech: arch('bremser', { projectileSpeed: 6, splash: 0.9, zone: 3 }, { kind: 'model', model: 'shot.klecks', color: '#2E2A30', arc: 1.3, trail: 'smoke', impact: 'splash' }),
+  schaum: arch('bremser', { projectileSpeed: 6, splash: 1.1, zone: 3 }, { kind: 'model', model: 'shot.klecks', color: '#DFF6F2', arc: 1.3, impact: 'splash' }),
+  amphore: arch('bremser', { projectileSpeed: 6, splash: 0.9, zone: 3 }, { kind: 'model', model: 'shot.amphore', color: '#B8C43A', arc: 1.3, tumble: true, impact: 'splash' }),
+  speer: arch('knacker', { projectileSpeed: 14 }, { kind: 'model', model: 'shot.speer', color: '#B08A5A', arc: 0.15, impact: 'dust' }),
+  eisenbolzen: arch('knacker', { projectileSpeed: 14 }, { kind: 'model', model: 'shot.eisenbolzen', color: '#D9DDE2', arc: 0.05, impact: 'spark' }),
+  kanone: arch('knacker', { attack: 'hitscan', cooldown: 3.3 }, { kind: 'tracer', color: '#E9DCFF', muzzle: 'flash', impact: 'spark' }),
+  schiene: arch('knacker', { attack: 'hitscan', cooldown: 3.3 }, { kind: 'beam', color: '#A66BFF', muzzle: 'energy', impact: 'energy' }),
+  glut: arch('brenner', { attack: 'hitscan', range: 1.8, splash: 0.9 }, { kind: 'flame', color: '#FF9A3C', trail: 'spark', impact: 'fire' }),
+  feuer: arch('brenner', { attack: 'hitscan', range: 1.8, splash: 0.9 }, { kind: 'flame', color: '#FF7A1A', trail: 'fire', impact: 'fire' }),
+  gas: arch('brenner', { attack: 'hitscan', range: 1.8, splash: 0.9 }, { kind: 'flame', color: '#FF8C2E', trail: 'smoke', impact: 'fire' }),
+  plasma: arch('brenner', { attack: 'hitscan', range: 1.8, splash: 0.9 }, { kind: 'flame', color: '#FF4FA3', trail: 'energy', muzzle: 'energy', impact: 'fire' }),
+  takt: arch('takt', { attack: 'pulse', range: 1.5 }, { kind: 'pulse', color: '#F2C230', impact: 'none' }),
+  blitz: arch('knacker', { attack: 'hitscan', chain: 2 }, { kind: 'bolt', color: '#9FD8FF', muzzle: 'energy', impact: 'energy' }),
+  frost: arch('bremser', { projectileSpeed: 7, splash: 0.8 }, { kind: 'model', model: 'shot.klecks', color: '#BFE9FF', arc: 0.6, trail: 'frost', impact: 'frost' }),
+  netz: arch('bremser', { projectileSpeed: 7, splash: 0.8 }, { kind: 'model', model: 'shot.kiesel', color: '#E9E2CF', arc: 1, tumble: true, impact: 'net' }),
+  energiekugel: arch('knacker', { projectileSpeed: 7 }, { kind: 'model', color: '#7CF0D0', arc: 0, trail: 'energy', impact: 'energy' }),
+  feuerkugel: arch('brenner', { projectileSpeed: 6, splash: 0.8 }, { kind: 'model', color: '#FF8A2A', arc: 0.8, trail: 'fire', muzzle: 'spark', impact: 'fire' }),
+};
+const ABILITY = { name: 'Zeitglocke', effect: 'zeitglocke', color: '#F2C230', radius: 0 };
+
+let nextId = 1;
+const state = { time: 0, tick: 0, phase: 'wave', enemies: [], towers: [], projectiles: [], zones: [] };
+const sim = {
+  state,
+  map: { width: W, height: H },
+  towerById: (id) => state.towers.find((t) => t.id === id) ?? null,
+  enemyById: (id) => state.enemies.find((e) => e.id === id && e.alive) ?? null,
+};
+const world = { base: { x: tileX(W - 1) + 1, z: PATH_Z }, radius: 10, hitBase() {} };
+
+function addTower(tx, tz, a) {
+  const tower = { id: nextId++, arch: a, tier: 0, level: 1, tx, tz, x: tileX(tx), z: tileZ(tz), stats: a.stats, buffDamage: 0, buffRate: 0, buffRange: 0, cooldown: Math.random() * a.stats.cooldown, targetId: -1, aimX: tileX(tx), aimZ: PATH_Z, lastShot: -Infinity, beamTime: 0 };
+  state.towers.push(tower);
+  return tower;
+}
+function addEnemy(x, opts = {}) {
+  const def = { id: 'attrappe', color: opts.color ?? '#b5653a', boss: Boolean(opts.boss), flying: Boolean(opts.flying), lives: opts.boss ? 5 : 1, radius: opts.boss ? 0.6 : 0.25, scale: opts.boss ? 2.2 : 1 };
+  const enemy = { id: nextId++, def, hp: 100, maxHp: 100, x, z: PATH_Z + (opts.lane ?? 0), px: x, pz: PATH_Z + (opts.lane ?? 0), dx: 1, dz: 0, speed: opts.speed ?? 0, alive: true, walk: Math.random() * 6 };
+  state.enemies.push(enemy);
+  return enemy;
+}
+
+const inst = {
+  tower: new InstancedModel(getModel('example.slinger'), materials, { capacity: 32 }),
+  enemy: new InstancedModel(getModel('example.clubman'), materials, { capacity: 256 }),
+};
+scene.add(inst.tower.group, inst.enemy.group);
+const mat = new THREE.Matrix4(), pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+const ctx = makeAnimCtx();
+const baseY = (enemy) => (enemy.def.flying ? FLY_HEIGHT : -PATH_DEPTH);
+const entities = {
+  muzzleOf(tower, out) {
+    const dx = tower.aimX - tower.x, dz = tower.aimZ - tower.z, len = Math.hypot(dx, dz) || 1;
+    out.set(tower.x + (dx / len) * 0.3, 0.92, tower.z + (dz / len) * 0.3);
+    return true;
+  },
+  enemyCenter(enemy, out) {
+    return out.set(enemy.x, baseY(enemy) + 0.3 * (enemy.def.scale ?? 1), enemy.z);
+  },
+};
+function drawStandIns(alpha) {
+  inst.tower.begin();
+  for (const t of state.towers) {
+    ctx.aimYaw = Math.atan2(t.aimX - t.x, t.aimZ - t.z); ctx.level = 1; ctx.active = 1; ctx.seed = (t.id * 0.37) % 1; ctx.t = state.time;
+    ctx.fire = Math.max(0, 1 - (state.time - t.lastShot) / 0.3); ctx.charge = 1;
+    mat.compose(pos.set(t.x, 0, t.z), quat.identity(), scl.set(1, 1, 1));
+    inst.tower.add(mat, ctx);
+  }
+  inst.tower.end();
+  inst.enemy.begin();
+  for (const e of state.enemies) {
+    if (!e.alive) continue;
+    const s = e.def.scale ?? 1;
+    ctx.walk = e.walk; ctx.move = e.speed > 0 ? 1 : 0; ctx.seed = (e.id * 0.37) % 1; ctx.fire = 0; ctx.aimYaw = 0;
+    mat.compose(pos.set(e.px + (e.x - e.px) * alpha, baseY(e), e.z), quat.setFromAxisAngle(up, Math.atan2(e.dx, e.dz)), scl.set(s, s, s));
+    inst.enemy.add(mat, ctx);
+  }
+  inst.enemy.end();
+}
+
+const env = { scene, camera, renderer, materials, content: {} };
+const layer = createEffectLayer(env, entities, world);
+layer.setQuality(q.get('quality') ?? 'high');
+layer.applySettings({ shake: q.get('shake') !== '0', floatingText: q.get('text') !== '0' });
+layer.bind(sim);
+
+// --- Mini-Simulation der Attrappen ---
+let events = [];
+function fireTower(tower, enemy) {
+  const s = tower.stats, shot = tower.arch.tiers[0].shot;
+  tower.lastShot = state.time; tower.targetId = enemy.id; tower.aimX = enemy.x; tower.aimZ = enemy.z;
+  events.push({ type: 'shot', tower, targetId: enemy.id, x: enemy.x, z: enemy.z, flying: enemy.def.flying });
+  if (s.attack === 'projectile') {
+    const d = Math.hypot(enemy.x - tower.x, enemy.z - tower.z);
+    const area = s.splash > 0;
+    state.projectiles.push({ id: nextId++, towerId: tower.id, arch: tower.arch, tier: 0, sx: tower.x, sz: tower.z, tx: enemy.x, tz: enemy.z, targetId: area ? -1 : enemy.id, targetFlying: enemy.def.flying, t: 0, pt: 0, duration: Math.max(0.05, d / s.projectileSpeed) });
+  } else if (s.attack === 'pulse') {
+    events.push({ type: 'hit', arch: tower.arch, tier: 0, x: tower.x, z: tower.z, flying: false, splash: s.range });
+  } else {
+    events.push({ type: 'hit', arch: tower.arch, tier: 0, x: enemy.x, z: enemy.z, flying: enemy.def.flying, splash: s.splash });
+    events.push({ type: 'damage', enemy, amount: 20, shield: false });
+    if (s.chain > 0) {
+      const others = state.enemies.filter((o) => o.alive && o !== enemy).sort((a, b) => Math.abs(a.x - enemy.x) - Math.abs(b.x - enemy.x)).slice(0, s.chain);
+      let from = enemy;
+      for (const o of others) { events.push({ type: 'chain', arch: tower.arch, tier: 0, fromX: from.x, fromZ: from.z, toX: o.x, toZ: o.z, flying: false }); from = o; }
+    }
+  }
+}
+function killEnemy(enemy, bounty = 12) {
+  enemy.alive = false;
+  events.push({ type: 'kill', enemy, bounty, towerId: -1 });
+  state.enemies.splice(state.enemies.indexOf(enemy), 1);
+}
+let auto = null; // Funktion, die je Zeitschritt läuft (Dauerbetrieb, Lasttest)
+function stepSim() {
+  state.time += SIM_DT; state.tick++;
+  for (const e of state.enemies) {
+    e.px = e.x; e.x += e.speed * SIM_DT; e.walk += e.speed * SIM_DT * 10;
+  }
+  for (let i = state.projectiles.length - 1; i >= 0; i--) {
+    const p = state.projectiles[i];
+    p.pt = p.t; p.t += SIM_DT / p.duration;
+    if (p.targetId >= 0) { const en = sim.enemyById(p.targetId); if (en) { p.tx = en.x; p.tz = en.z; } }
+    if (p.t >= 1) {
+      state.projectiles.splice(i, 1);
+      const s = p.arch.stats;
+      events.push({ type: 'hit', arch: p.arch, tier: 0, x: p.tx, z: p.tz, flying: p.targetFlying, splash: s.splash });
+      const en = sim.enemyById(p.targetId);
+      if (en) events.push({ type: 'damage', enemy: en, amount: 20, shield: false });
+      if (s.zone > 0) { const zone = { id: nextId++, arch: p.arch, tier: 0, towerId: p.towerId, x: p.tx, z: p.tz, radius: s.splash, time: s.zone, duration: s.zone }; state.zones.push(zone); events.push({ type: 'zone', zone }); }
+    }
+  }
+  for (let i = state.zones.length - 1; i >= 0; i--) { state.zones[i].time -= SIM_DT; if (state.zones[i].time <= 0) state.zones.splice(i, 1); }
+  // Türme mit Dauerfeuer (Kennzeichen `repeat`) schießen weiter.
+  for (const t of state.towers) {
+    if (!t.repeat) continue;
+    t.cooldown -= SIM_DT;
+    if (t.cooldown <= 0) {
+      const target = t.pick ? t.pick() : sim.enemyById(t.targetId);
+      if (target) { fireTower(t, target); t.cooldown += t.stats.cooldown; } else t.cooldown = 0.1;
+    }
+  }
+  if (auto) auto();
+  const out = events; events = [];
+  return out;
+}
+
+// --- Szenen: Jeder Effekt hat einen Auslöser auf einer kleinen, festen Bühne ---
+function reset() {
+  state.enemies.length = 0; state.towers.length = 0; state.projectiles.length = 0; state.zones.length = 0; state.time = 0; auto = null; events = [];
+  layer.bind(sim);
+}
+/** Ein Turm über dem Weg, ein Gegner (oder mehrere) darauf. */
+function duel(a, opts = {}) {
+  reset();
+  const tower = addTower(opts.far ? 3 : 5, opts.far ? 1 : 2, a);
+  const enemy = addEnemy(tileX(7), { flying: opts.flying });
+  if (opts.crowd) { addEnemy(tileX(7) + 0.7, { lane: 0.2 }); addEnemy(tileX(7) - 0.6, { lane: -0.2 }); addEnemy(tileX(7) + 1.5, {}); }
+  tower.aimX = enemy.x; tower.aimZ = enemy.z;
+  return { tower, enemy };
+}
+const SCENES = {};
+for (const [name, a] of Object.entries(ARCHS)) {
+  SCENES[name] = () => {
+    const { tower, enemy } = duel(a, { crowd: a.stats.splash > 0 || a.stats.chain > 0, far: a.stats.attack === 'projectile' && a.stats.range > 2 && name !== 'takt' });
+    tower.repeat = a.stats.attack === 'beam' || a.stats.cooldown < 0.5;
+    tower.cooldown = tower.stats.cooldown;
+    fireTower(tower, enemy);
+  };
+  SCENES[name + '-luft'] = () => { const { tower, enemy } = duel(a, { flying: true, far: true }); fireTower(tower, enemy); };
+}
+for (const kind of ['dust', 'spark', 'explosion', 'fire', 'frost', 'energy', 'splash', 'net']) {
+  // Reiner Einschlag: einmal als Einzeltreffer links, einmal mit Flächenradius rechts.
+  SCENES['impact-' + kind] = () => {
+    reset();
+    addEnemy(tileX(5.5)); addEnemy(tileX(8));
+    const single = arch('schuetze', {}, { kind: 'model', color: ARCH_COLOR[kind], impact: kind });
+    const area = arch('werfer', { splash: 1.2 }, { kind: 'model', color: ARCH_COLOR[kind], impact: kind });
+    events.push({ type: 'hit', arch: single, tier: 0, x: tileX(5.5), z: PATH_Z, flying: false, splash: 0 });
+    events.push({ type: 'hit', arch: area, tier: 0, x: tileX(8), z: PATH_Z, flying: false, splash: 1.2 });
+  };
+}
+const ARCH_COLOR = { dust: '#9A968F', spark: '#FFE27A', explosion: '#FF9A3C', fire: '#FF8A2A', frost: '#BFE9FF', energy: '#5AA8FF', splash: '#E0A030', net: '#E9E2CF' };
+Object.assign(SCENES, {
+  kill() { reset(); const a = addEnemy(tileX(5)); const b = addEnemy(tileX(8), { color: '#5d7fb8' }); addEnemy(tileX(6.5)); killEnemy(a, 12); killEnemy(b, 150); },
+  'kill-luft'() { reset(); const a = addEnemy(tileX(6), { flying: true, color: '#c94f6d' }); killEnemy(a, 18); },
+  bosskill() { reset(); const b = addEnemy(tileX(7), { boss: true, color: '#8a5a3c' }); addEnemy(tileX(4)); killEnemy(b, 250); },
+  leak() { reset(); const e = addEnemy(world.base.x - 0.5); e.alive = false; state.enemies.length = 0; events.push({ type: 'leak', enemy: e, lives: 3 }); },
+  phase() { reset(); const b = addEnemy(tileX(7), { boss: true, color: '#8a5a3c' }); events.push({ type: 'phase', enemy: b, index: 0 }); },
+  spawn() { reset(); for (let i = 0; i < 3; i++) { const e = addEnemy(tileX(1) + i * 0.7); events.push({ type: 'spawn', enemy: e }); } },
+  build() { reset(); const t = addTower(6, 2, ARCHS.kiesel); events.push({ type: 'build', tower: t }); },
+  upgrade() { reset(); const t = addTower(6, 2, ARCHS.klecks); const t2 = addTower(8, 2, ARCHS.feuer); events.push({ type: 'upgrade', tower: t }, { type: 'upgrade', tower: t2 }); },
+  modernize() { reset(); const t = addTower(6, 2, ARCHS.kiesel); events.push({ type: 'modernize', tower: t, fromTier: 0 }); },
+  sell() { reset(); const t = addTower(6, 2, ARCHS.kiesel); state.towers.length = 0; events.push({ type: 'sell', tower: t, refund: 84 }); },
+  ability() { reset(); for (let i = 0; i < 9; i++) addEnemy(tileX(1 + i * 1.3), { lane: (i % 3 - 1) * 0.2 }); addTower(5, 2, ARCHS.kiesel); addTower(8, 6, ARCHS.felsbrocken); events.push({ type: 'ability', def: ABILITY, x: 0, z: 0 }); },
+  // Verschmelzung: zwei Zutaten lösen sich in Lichter auf, die in den Kern fliegen (die Attrappen bleiben hier stehen;
+  // das Schrumpfen der Zutaten und das Anschwellen des Kerns zeichnet die Figurenschicht, siehe dev/entities.html?super=2&anim=fuse).
+  fuse() {
+    reset();
+    const core = addTower(6, 2, ARCHS.kiesel); const a = addTower(5, 2, ARCHS.feuer); const b = addTower(7, 1, ARCHS.klecks);
+    state.towers.length = 1;
+    events.push({ type: 'fuse', tower: core, parts: [a, b].map((t) => ({ id: t.id, arch: t.arch, branch: 0, x: t.x, z: t.z })), fee: 0, mega: false });
+  },
+  // Megawaffe: dieselbe Verschmelzung als zweiter Schritt (höhere Lichtsäule, weitere Ringe). Superwaffen-Angriffe und die
+  // Megawaffe selbst zeigt dev/entities.html?super=1&cores=<rolle>&world=1&look=core bzw. ?super=2&mega=1&anim=megafuse.
+  megafuse() {
+    reset();
+    const core = addTower(6, 2, ARCHS.kiesel); const a = addTower(5, 2, ARCHS.feuer); const b = addTower(7, 1, ARCHS.klecks);
+    state.towers.length = 1;
+    core.super = true;
+    events.push({ type: 'fuse', tower: core, parts: [a, b].map((t) => ({ id: t.id, arch: t.arch, branch: 0, x: t.x, z: t.z })), fee: 0, mega: true });
+  },
+  age() { reset(); events.push({ type: 'age', from: 0, to: 1, gift: 50 }); },
+  zone() {
+    reset();
+    const defs = [ARCHS.klecks, ARCHS.amphore, ARCHS.pech, ARCHS.schaum];
+    defs.forEach((a, i) => { const zone = { id: nextId++, arch: a, tier: 0, towerId: 0, x: tileX(2.5 + i * 2.6), z: PATH_Z, radius: 0.9 + (i === 3 ? 0.2 : 0), time: 3, duration: 3 }; state.zones.push(zone); });
+    addEnemy(tileX(2.5)); addEnemy(tileX(7.7));
+  },
+  damage() { reset(); const a = addEnemy(tileX(5)); const b = addEnemy(tileX(8), { color: '#5d7fb8' }); events.push({ type: 'damage', enemy: a, amount: 30, shield: false }, { type: 'damage', enemy: b, amount: 30, shield: true }, { type: 'heal', enemy: a }); },
+  zahlen() { reset(); for (let i = 0; i < 8; i++) { const e = addEnemy(tileX(2 + i * 1.3), { lane: (i % 2) * 0.2 }); killEnemy(e, [3, 12, 25, 48, 120, 250, 999, 7][i]); } },
+});
+
+// --- Dauerbetrieb: alle Effekte reihum ---
+function playAll() {
+  reset();
+  const names = ['kiesel', 'pfeil', 'muskete', 'kurbel', 'laser', 'felsbrocken', 'bombe', 'rakete', 'klecks', 'amphore', 'speer', 'eisenbolzen', 'kanone', 'schiene', 'glut', 'feuer', 'plasma', 'blitz', 'frost', 'dauerstrahl'];
+  const spots = [[1, 2], [3, 2], [5, 2], [7, 2], [9, 2], [11, 2], [1, 6], [3, 6], [5, 6], [7, 6], [9, 6], [11, 6], [2, 1], [6, 1], [10, 1], [2, 7], [6, 7], [10, 7], [4, 0], [8, 0]];
+  names.forEach((name, i) => {
+    const t = addTower(spots[i][0], spots[i][1], ARCHS[name]);
+    t.repeat = true;
+    t.pick = () => {
+      let best = null, bd = t.stats.range + 0.6;
+      for (const e of state.enemies) { const d = Math.hypot(e.x - t.x, e.z - t.z); if (e.alive && d < bd) { bd = d; best = e; } }
+      return best;
+    };
+  });
+  const takt = addTower(12, 2, ARCHS.takt);
+  let spawnT = 0, miscT = 2, n = 0;
+  auto = () => {
+    spawnT -= SIM_DT;
+    if (spawnT <= 0) {
+      spawnT = 0.55;
+      n++;
+      const e = addEnemy(tileX(-0.5), { speed: 1.1, lane: (Math.random() - 0.5) * 0.5, boss: n % 40 === 0, flying: n % 9 === 0, color: ['#b5653a', '#5d7fb8', '#7da35a', '#c94f6d'][n % 4] });
+      e.life = 4 + Math.random() * 7;
+      events.push({ type: 'spawn', enemy: e });
+    }
+    for (const e of [...state.enemies]) {
+      e.life -= SIM_DT;
+      if (e.x > world.base.x - 0.6) { e.alive = false; state.enemies.splice(state.enemies.indexOf(e), 1); events.push({ type: 'leak', enemy: e, lives: 3 }); } else if (e.life <= 0) killEnemy(e, 5 + ((e.id * 7) % 40));
+    }
+    miscT -= SIM_DT;
+    if (miscT <= 0) {
+      miscT = 2.2;
+      const k = Math.floor(state.time / 2.2) % 6;
+      const t = state.towers[(Math.random() * state.towers.length) | 0];
+      if (k === 0) events.push({ type: 'build', tower: t });
+      if (k === 1) events.push({ type: 'upgrade', tower: t });
+      if (k === 2) events.push({ type: 'modernize', tower: t, fromTier: 0 });
+      if (k === 3) { events.push({ type: 'shot', tower: takt, targetId: -1, x: takt.x, z: takt.z, flying: false }); }
+      if (k === 4 && Math.floor(state.time / 13.2) % 2 === 1) events.push({ type: 'ability', def: ABILITY, x: 0, z: 0 });
+      if (k === 5) { const b = state.enemies.find((e) => e.def.boss); if (b) events.push({ type: 'phase', enemy: b, index: 0 }); }
+    }
+  };
+}
+
+// --- Lasttest: 300 Geschosse, fortlaufend Einschläge und Siege ---
+function playStress() {
+  reset();
+  const names = ['kiesel', 'pfeil', 'bombe', 'rakete', 'klecks', 'speer', 'felsbrocken', 'eisenbolzen', 'frost', 'energiekugel', 'feuerkugel', 'amphore'];
+  const towers = [];
+  for (let i = 0; i < 40; i++) towers.push(addTower(i % 14, [0, 1, 2, 6, 7, 8][i % 6], ARCHS[names[i % names.length]]));
+  const shooters = ['kurbel', 'laser', 'glut', 'feuer', 'blitz', 'dauerstrahl', 'plasma', 'schiene'].map((name, i) => { const t = addTower(1 + i * 1.6 | 0, i % 2 ? 3 : 5, ARCHS[name]); t.repeat = true; t.pick = () => state.enemies[(Math.random() * state.enemies.length) | 0]; return t; });
+  void shooters;
+  for (let i = 0; i < 120; i++) { const e = addEnemy(tileX(Math.random() * 13), { speed: 0.6, lane: (Math.random() - 0.5) * 0.6, color: ['#b5653a', '#5d7fb8', '#7da35a', '#c94f6d'][i % 4] }); e.life = Math.random() * 6; }
+  auto = () => {
+    while (state.projectiles.length < 300) {
+      const t = towers[(Math.random() * towers.length) | 0];
+      const e = state.enemies[(Math.random() * state.enemies.length) | 0];
+      const before = state.projectiles.length;
+      fireTower(t, e);
+      const p = state.projectiles[before];
+      if (p) p.duration = 0.5 + Math.random() * 0.8;
+    }
+    for (const e of [...state.enemies]) {
+      e.life -= SIM_DT;
+      if (e.x > tileX(13) || e.life <= 0) {
+        killEnemy(e, 5 + ((e.id * 7) % 40));
+        const ne = addEnemy(tileX(Math.random() * 3), { speed: 0.6, lane: (Math.random() - 0.5) * 0.6, color: e.def.color }); ne.life = 2 + Math.random() * 5;
+        events.push({ type: 'spawn', enemy: ne });
+      }
+    }
+  };
+}
+
+// --- Bedienfeld ---
+const panel = document.getElementById('panel');
+if (q.get('ui') === '0' || frozen) panel.classList.add('hidden');
+function section(title, names) {
+  const h = document.createElement('h4'); h.textContent = title; panel.append(h);
+  for (const name of names) {
+    const b = document.createElement('button'); b.textContent = name;
+    b.onclick = () => { if (name === 'alle') playAll(); else if (name === 'lasttest') playStress(); else SCENES[name](); };
+    panel.append(b);
+  }
+}
+section('Dauerbetrieb', ['alle', 'lasttest']);
+section('Schüsse', Object.keys(ARCHS));
+section('Schüsse auf Flieger', ['pfeil-luft', 'muskete-luft', 'laser-luft', 'rakete-luft', 'speer-luft']);
+section('Einschläge (links einzeln, rechts Fläche)', Object.keys(SCENES).filter((n) => n.startsWith('impact-')));
+section('Ereignisse', ['kill', 'kill-luft', 'bosskill', 'leak', 'phase', 'spawn', 'build', 'upgrade', 'modernize', 'sell', 'ability', 'age', 'zone', 'damage', 'zahlen', 'fuse', 'megafuse']);
+addEventListener('keydown', (e) => { if (e.key === 'a') playAll(); if (e.key === ' ') SCENES.ability(); if (e.key === 'k') SCENES.kill(); if (e.key === 'b') SCENES.bosskill(); });
+
+// --- Schleife ---
+const infoBox = document.getElementById('info');
+let speed = num('speed', 1);
+let updateSum = 0, updateN = 0, updateMax = 0, peak = 0, frames = 0;
+const samples = [];
+function frame(dt, simDt, alpha) {
+  drawStandIns(alpha);
+  const a = performance.now();
+  layer.update(dt, simDt, alpha);
+  const ms = performance.now() - a;
+  samples.push(ms); if (samples.length > 120) samples.shift();
+  updateSum += ms; updateN++; updateMax = Math.max(updateMax, ms); peak = Math.max(peak, layer.debug.particles);
+  camera.position.add(layer.shake);
+  camera.updateMatrixWorld();
+  renderer.info.reset();
+  if (post) post.render(dt); else renderer.render(scene, camera);
+  camera.position.sub(layer.shake);
+  frames++;
+  const mean = samples.reduce((s, v) => s + v, 0) / samples.length;
+  window.__info = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, particles: layer.debug.particles, updateMs: Number(mean.toFixed(3)), updateMsAll: Number((updateSum / updateN).toFixed(3)), updateMsMax: Number(updateMax.toFixed(2)), peakParticles: peak, budget: layer.debug.budget, glows: layer.debug.glows, rings: layer.debug.rings, texts: layer.debug.texts, projectiles: state.projectiles.length, frames };
+}
+
+if (frozen) {
+  // Je Effekt: auslösen, mit festem Zeitschritt bis zu jedem gewünschten Moment rechnen, das Bild in den Kontaktbogen kopieren.
+  const sheet = document.createElement('canvas');
+  sheet.width = innerWidth; sheet.height = innerHeight;
+  sheet.style.cssText = 'position:fixed;left:0;top:0';
+  document.body.append(sheet);
+  renderer.domElement.style.visibility = 'hidden';
+  const g = sheet.getContext('2d');
+  g.font = '12px system-ui, sans-serif';
+  sheetFx.forEach((name, row) => {
+    if (!SCENES[name]) throw new Error(`Unbekannter Effekt "${name}". Bekannt: ${Object.keys(SCENES).join(', ')}`);
+    randomState = num('seed', 7) >>> 0;
+    SCENES[name]();
+    layer.handleEvents(events); events = [];
+    drawStandIns(1);
+    layer.update(0, 0, 1);
+    let done = 0;
+    sheetTs.forEach((t, col) => {
+      const steps = Math.round(t * 60);
+      for (; done < steps; done++) { layer.handleEvents(stepSim()); drawStandIns(1); layer.update(SIM_DT, SIM_DT, 1); }
+      frame(0, 0, 1);
+      const cell = row * sheetTs.length + col, cx = (cell % sheetCols) * VIEW_W, cy = Math.floor(cell / sheetCols) * VIEW_H;
+      g.drawImage(renderer.domElement, cx, cy, VIEW_W, VIEW_H);
+      g.fillStyle = 'rgba(20,28,38,.75)'; g.fillRect(cx + 4, cy + 4, g.measureText(`${name} · ${t} s`).width + 10, 18);
+      g.fillStyle = '#fff'; g.fillText(`${name} · ${t} s`, cx + 9, cy + 17);
+    });
+  });
+  infoBox.classList.add('hidden');
+  requestAnimationFrame(() => { window.__ready = true; });
+} else {
+  if (q.get('stress') === '1') { speed = num('speed', 4); playStress(); } else if (q.get('all') === '1') playAll(); else if (q.get('fx')) SCENES[q.get('fx')]();
+  let last = performance.now(), acc = 0;
+  (function loop() {
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    acc += dt * speed;
+    let n = 0;
+    if (events.length) { layer.handleEvents(events); events = []; }
+    while (acc >= SIM_DT && n < 12) { layer.handleEvents(stepSim()); acc -= SIM_DT; n++; }
+    controls.update();
+    frame(dt, n * SIM_DT, Math.min(1, acc / SIM_DT));
+    if (frames === 3) window.__ready = true;
+    if (frames % 10 === 0) { const i = window.__info; infoBox.textContent = `Aufrufe ${i.calls} · Dreiecke ${i.triangles} · Teilchen ${i.particles}/${i.budget} (Spitze ${i.peakParticles}) · update ${i.updateMs} ms (max ${i.updateMsMax})`; }
+    requestAnimationFrame(loop);
+  })();
+}
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (post) post.setSize(innerWidth, innerHeight, 1); });
+</script>
+</body>
+</html>

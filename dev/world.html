@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Welt-Test</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1c2230; font: 12px system-ui, sans-serif; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 8px; bottom: 8px; color: #fff; background: rgba(20, 24, 34, .55); padding: 4px 8px; border-radius: 6px; pointer-events: none; white-space: pre; }
+</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Testseite der Welt. Parameter:
+//   map=<Kennung oder Index>   age=<Index>        Karte und Zeitalter
+//   to=<Index>&p=<0..1>        friert die Zeitwelle von `age` nach `to` beim Fortschritt p ein
+//   az, el, dist, tx, tz       Kamera (Grad, Grad, Felder) und ihr Blickpunkt; Standard ist die Ansicht des Spiels
+//   q=low|medium|high          Grafikstufe          post=0  ohne Bloom
+//   grid=1  flight=1           Bauraster bzw. Luftlinien einblenden
+//   demo=1                     fehlende große Requisiten durch example.tree / example.rock vertreten
+//   t=<Sekunden>               friert die Uhr der Welt ein (reproduzierbare Bilder)
+//   occ=1                      belegt ein paar Felder (Bodendeko weicht)      hit=1  Basis zuckt      flame=0.4
+//   hud=0                      ohne Textanzeige     bench=1  misst update() über 240 Bilder
+//   focus=<Art>                Kamera auf das erste besondere Feld dieser Art (hoehe, quelle, takt, sumpf), Abstand 7
+//   towers=1                   stellt Türme des Zeitalters auf alle besonderen Felder (towers=all: auf jedes zweite Baufeld)
+//   hover=<tx>,<tz>            hebt das Bodenzeichen eines besonderen Feldes hervor
+//   stage=<n>                  Satz der Wege n (0 = Grundwege) im Zeitalter, ab dem er gilt (ersetzt age); tostage=<n> dazu
+//                              die Zeitwelle bis zum Beginn von Satz n (mit p=<0..1> eingefroren): der Wechsel der Wege
+//   hint=coming:<Zeitalter> | new:<Zeitalter>   kommende bzw. eben neue Wegstücke leuchten lassen
+//   look=<tx>,<tz>             Kamera auf dieses Feld, Abstand 7 (für Nahaufnahmen der Spuren)
+// Messen: await __measure({ frames: 60, groups: true }) hält die Schleife an und liefert Zeit, Aufrufe und Dreiecke,
+//         zerlegt nach den Gruppen der Welt und dem Schattendurchgang. Regeln ohne Platz meldet die Konsole als Warnung.
+// Tasten: 1-9 Zeitwelle zu diesem Zeitalter, G Raster, F Luftlinien, H Treffer an der Basis, Q Grafikstufe wechseln.
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { content } from '../src/content/index.js';
+import { getModel, hasModel } from '../src/content/models.js';
+import { CAMERA_AZIMUTH, CAMERA_ELEVATION, CAMERA_FOV } from '../src/render/layout.js';
+import { configureRenderer, createMaterials } from '../src/render/look.js';
+import { PostFx } from '../src/render/post.js';
+import { createWorld } from '../src/render/world.js';
+import { createModel } from '../src/render/kit.js';
+import { createModelObject } from '../src/render/instances.js';
+import { pathTiles } from '../src/sim/path.js';
+import { stageSets } from '../src/render/world/mapinfo.js';
+
+const q = new URLSearchParams(location.search);
+const num = (key, fallback) => (q.has(key) && q.get(key) !== '' ? Number(q.get(key)) : fallback);
+
+const mapParam = q.get('map') ?? '0';
+const map = content.maps.find((m) => m.id === mapParam) ?? content.maps[Number(mapParam) || 0] ?? content.maps[0];
+const sets = stageSets(map, content.ages.length);
+const stageAge = (n) => sets[Math.min(sets.length - 1, Math.max(0, n))].from;
+const ageIndex = Math.min(content.ages.length - 1, Math.max(0, q.has('stage') ? stageAge(num('stage', 0)) : num('age', 0)));
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+configureRenderer(renderer);
+renderer.info.autoReset = false;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV, innerWidth / innerHeight, 1, 700);
+const materials = createMaterials();
+
+// demo=1: fehlende Requisiten vertreten, damit sich die Komposition beurteilen lässt.
+const demo = q.get('demo') === '1';
+const demoModels = new Map();
+const demoModel = (id, build) => { if (!demoModels.has(id)) { const m = createModel(id); build(m.part('body')); demoModels.set(id, m.build()); } return demoModels.get(id); };
+const resolveModel = (id) => {
+  if (!demo || hasModel(id) || !id.startsWith('prop.')) return getModel(id);
+  const name = id.split('.')[2] ?? '';
+  if (name === 'deko1') return demoModel('demo.tuft', (b) => { for (const [x, z, r] of [[0, 0, 0], [0.07, 0.03, 0.5], [-0.06, 0.05, -0.4]]) b.cone({ r: 0.035, h: 0.16, seg: 4, base: [x, 0, z], rot: [r * 0.5, 0, r], color: '#5f9a4a', colorTop: '#9ccf6a' }); });
+  if (name === 'deko2') return demoModel('demo.pebble', (b) => { b.sphere({ r: 0.07, detail: 0, at: [0, 0.03, 0], scale: [1.2, 0.6, 1], color: '#9a968e', faceJitter: 0.1 }); b.sphere({ r: 0.045, detail: 0, at: [0.1, 0.02, 0.04], scale: [1, 0.6, 1], color: '#8a867e', faceJitter: 0.1 }); });
+  if (name === 'block') return demoModel('demo.block', (b) => { b.sphere({ r: 0.42, detail: 1, at: [0, 0.2, 0], scale: [1, 0.75, 0.95], rot: [0.2, 0.5, 0], color: '#8f8b84', faceJitter: 0.1 }); b.sphere({ r: 0.22, detail: 0, at: [0.25, 0.12, 0.22], color: '#7b776f', faceJitter: 0.1 }); });
+  if (/findling|fels|kohle|kugel|stein|faesser|amphoren|truhe|mosaik|heuhaufen/.test(name)) return getModel('example.rock');
+  return getModel('example.tree');
+};
+
+const world = createWorld({ scene, camera, renderer, materials, content }, { resolveModel });
+const quality = q.get('q') ?? 'high';
+world.setQuality(quality);
+world.build(map, ageIndex);
+world.setGridVisible(q.get('grid') === '1');
+world.setFlightLines(q.get('flight') === '1');
+if (q.has('flame')) world.setFlame(num('flame', 1));
+if (q.get('occ') === '1') for (let tx = 0; tx < map.width; tx += 2) for (let tz = 0; tz < map.height; tz += 3) world.setTileOccupied(tx, tz, true);
+
+// Türme auf den besonderen Feldern (Einzelobjekte genügen für die Testseite).
+const roles = ['schuetze', 'werfer', 'bremser', 'brenner', 'knacker', 'taktgeber'];
+const towerSpots = [];
+if (q.get('towers') === '1') for (const t of map.tiles ?? []) towerSpots.push([t.tx, t.tz]);
+if (q.get('towers') === 'all') for (let tz = 0; tz < map.height; tz++) for (let tx = (tz % 2); tx < map.width; tx += 2) towerSpots.push([tx, tz]);
+const pathSet = new Set(sets.flatMap((set) => set.waypoints.flatMap((w) => pathTiles(w).map(([x, z]) => `${x},${z}`))));
+towerSpots.forEach(([tx, tz], i) => {
+  if (pathSet.has(`${tx},${tz}`) || map.blocked.some(([bx, bz]) => bx === tx && bz === tz)) return;
+  const id = `tower.${content.ages[ageIndex].id}.${roles[i % roles.length]}`;
+  if (!hasModel(id)) return;
+  const { object } = createModelObject(getModel(id), materials);
+  object.position.set(tx - map.width / 2 + 0.5, 0, tz - map.height / 2 + 0.5);
+  object.rotation.y = i * 1.3;
+  scene.add(object);
+  world.setTileOccupied(tx, tz, true);
+});
+if (q.has('hover')) { const [hx, hz] = q.get('hover').split(',').map(Number); world.highlightSpecialTile({ tx: hx, tz: hz }); }
+
+const look = q.has('look') ? q.get('look').split(',').map(Number) : null;
+const focus = look ? { tx: look[0], tz: look[1] } : (map.tiles ?? []).find((t) => t.kind === q.get('focus'));
+const az = num('az', CAMERA_AZIMUTH) * Math.PI / 180;
+const el = num('el', CAMERA_ELEVATION) * Math.PI / 180;
+const dist = num('dist', focus ? 7 : 36);
+camera.position.set(Math.sin(az) * Math.cos(el) * dist, Math.sin(el) * dist, Math.cos(az) * Math.cos(el) * dist);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(num('tx', focus ? focus.tx - map.width / 2 + 0.5 : 0), 0, num('tz', focus ? focus.tz - map.height / 2 + 0.5 : 0.5));
+camera.position.add(controls.target).sub(new THREE.Vector3(0, 0, 0.5));
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.update();
+
+const post = q.get('post') !== '0' && quality === 'high' ? new PostFx(renderer, scene, camera) : null;
+
+if (q.has('to') || q.has('tostage')) {
+  world.transitionTo(q.has('tostage') ? stageAge(num('tostage', 1)) : num('to', ageIndex + 1), { duration: num('duration', 4.5) });
+  if (q.has('p')) world.debug.seekTransition(num('p', 0.5));
+}
+if (q.has('hint')) {
+  const [kind, age] = q.get('hint').split(':');
+  world.setPathHint({ kind: kind === 'new' ? 'new' : 'coming', stage: Number(age) || 0 });
+}
+if (q.has('t')) world.debug.freezeTime(num('t', 0));
+if (q.get('hit') === '1') world.hitBase();
+
+addEventListener('keydown', (e) => {
+  const n = Number(e.key);
+  if (n >= 1 && n <= 9 && n <= content.ages.length) world.transitionTo(n - 1);
+  if (e.key === 'g') world.setGridVisible(gridOn = !gridOn);
+  if (e.key === 'f') world.setFlightLines(flightOn = !flightOn);
+  if (e.key === 'h') world.hitBase();
+  if (e.key === 'q') world.setQuality(['low', 'medium', 'high'][qi = (qi + 1) % 3]);
+});
+let gridOn = q.get('grid') === '1', flightOn = q.get('flight') === '1', qi = 2;
+addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  post?.setSize(innerWidth, innerHeight, renderer.getPixelRatio());
+});
+
+const hud = document.getElementById('hud');
+if (q.get('hud') === '0') hud.style.display = 'none';
+window.world = world;
+let unplacedAge = -1;
+let paused = false;
+// Messung für Leistungsvergleiche: hält die Schleife an, zeichnet `frames` Bilder mit glFinish und zerlegt die Kosten
+// nach den Gruppen der Welt (Aufrufe und Dreiecke je Gruppe, dazu die Zeit ohne sie). Aufruf: await __measure({ frames: 60 })
+window.__measure = async ({ frames: n = 60, groups = true } = {}) => {
+  paused = true;
+  const gl = renderer.getContext();
+  const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const run = async (count) => {
+    let up = 0, rend = 0, calls = 0, tris = 0, worst = 0;
+    for (let i = 0; i < count; i++) {
+      await frame();
+      const t0 = performance.now();
+      world.update(1 / 60);
+      const t1 = performance.now();
+      renderer.info.reset();
+      renderer.toneMappingExposure = world.exposure;
+      if (post) { post.setBloom(world.bloom); post.render(); } else renderer.render(scene, camera);
+      gl.finish();
+      const t2 = performance.now();
+      up += t1 - t0; rend += t2 - t1; calls = renderer.info.render.calls; tris = renderer.info.render.triangles;
+      worst = Math.max(worst, t2 - t0);
+    }
+    return { updateMs: +(up / count).toFixed(3), renderMs: +(rend / count).toFixed(2), worstMs: +worst.toFixed(1), calls, triangles: tris };
+  };
+  await run(10);
+  const total = await run(n);
+  const out = { total, parts: {} };
+  if (groups) {
+    const list = [...world.group.children, ...scene.children.filter((c) => c !== world.group)];
+    for (const obj of list) {
+      if (!obj.visible) continue;
+      obj.visible = false;
+      const r = await run(Math.max(10, n >> 2));
+      obj.visible = true;
+      const name = obj.name || obj.type;
+      out.parts[name] = { calls: total.calls - r.calls, triangles: total.triangles - r.triangles, ms: +(total.renderMs - r.renderMs).toFixed(2) };
+    }
+    const sun = world.rig.sun;
+    if (sun.castShadow) {
+      sun.castShadow = false;
+      const r = await run(Math.max(10, n >> 2));
+      sun.castShadow = true;
+      out.parts.shadowPass = { calls: total.calls - r.calls, triangles: total.triangles - r.triangles, ms: +(total.renderMs - r.renderMs).toFixed(2) };
+    }
+  }
+  paused = false;
+  requestAnimationFrame(loop);
+  return out;
+};
+let frames = 0, updateSum = 0, updateMax = 0, last = performance.now(), frameSum = 0;
+function loop() {
+  if (paused) return;
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  const u0 = performance.now();
+  world.update(dt);
+  const u = performance.now() - u0;
+  if (frames > 5) { updateSum += u; updateMax = Math.max(updateMax, u); frameSum += dt * 1000; }
+  controls.update();
+  renderer.info.reset();
+  renderer.toneMappingExposure = world.exposure;
+  if (post) { post.setBloom(world.bloom); post.render(); } else renderer.render(scene, camera);
+  frames++;
+  const n = Math.max(1, frames - 6);
+  window.__info = {
+    calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+    frameMs: Number((frameSum / n).toFixed(2)), updateMs: Number((updateSum / n).toFixed(3)), updateMaxMs: Number(updateMax.toFixed(2)),
+    ...world.debug.stats(), frames,
+  };
+  // Regeln des Zeitalters, die auf dieser Karte keinen Platz fanden, melden (einmal je Zeitalter).
+  const unplaced = world.dressing?.unplaced ?? [];
+  if (unplacedAge !== world.ageIndex) {
+    unplacedAge = world.ageIndex;
+    if (unplaced.length) console.warn(`Dekoration: ${content.ages[world.ageIndex].id} auf ${map.id} ohne Platz für ${unplaced.join(', ')}`);
+  }
+  if (frames % 20 === 0) hud.textContent = `${map.name} · ${content.ages[world.ageIndex].name} · Wege ab ${content.ages[world.pathStage]?.name} · ${window.__info.calls} Aufrufe · ${window.__info.triangles} Dreiecke · update ${window.__info.updateMs} ms`;
+  if (frames === (q.has('settle') ? num('settle', 60) : 40)) window.__ready = true;
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

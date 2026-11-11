@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Figuren-Test</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe6f2; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 10px; bottom: 8px; font: 12px system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px #0008; pointer-events: none; white-space: pre; }
+</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Testseite der Figurenschicht. Eine kleine, handgeschriebene Simulation mit der Form des Vertrags `Sim` treibt sie an:
+// Gegner mehrerer Arten laufen den Weg entlang (Läufer, Flieger, Boss, Schildträger), Türme mehrerer Rollen und Stufen
+// beschießen sie, verlangsamen und entzünden sie.
+//
+// Parameter (alle optional):
+//   t=<s>        so viele Sekunden simulieren, dann einfrieren (reproduzierbare Bilder); ohne t läuft die Seite live
+//   count=<n>    Lasttest: n Gegner gleichzeitig und 80 Türme
+//   preview=1|2  Bauvorschau (1 = gültig, 2 = ungültig);  select=1  Auswahl;  ability=1  Zielkreis
+//   anim=build|upgrade|modernize|sell   löst die Animation `animAt` Sekunden (Standard 0.15) vor dem Einfrieren aus
+//   age=<n>      Zeitalter der Simulation (Standard 1: Türme des Stands 0 gelten als veraltet)
+//   az, el, dist Kamera (Grad, Grad, Felder);  look=x,z  Blickpunkt
+//   quality=low  ohne Schatten der Figuren;  post=1  mit Bloom;  night=1  Nachtlicht
+//   sim=real     die echte Simulation (src/sim/sim.js) mit den echten Inhalten statt der Testpartie; map=<kennung>, seed=<n>,
+//                towers=<n>; Wellen starten von selbst, nach jedem Zeitalterwechsel wird jeder zweite Turm modernisiert
+//   super=<n>    Superwaffen-Schau (erzwingt sim=real): n fertig verschmolzene Superwaffen verschiedener Rollen samt
+//                Vergleichstürmen der Stufe 3 beider Ausbauzweige; anim=fuse verschmilzt eine weitere Gruppe `animAt` Sekunden
+//                vor dem Einfrieren (live: nach 1,5 s, danach alle 5 s die nächste Gruppe, solange welche da sind);
+//                age=<n> Zeitalter der Türme; world=1 echte Welt (Licht, Insel) dieses Zeitalters statt der neutralen Wiese;
+//                fx=0 ohne Effektschicht; waves=0 ohne Gegner; plain=1 dieselben Türme ohne Superwaffen-Darstellung (Vergleichsmessung)
+//                cores=schuetze,werfer,...  Kernrollen der Gruppen in dieser Reihenfolge (eine einzelne Rolle zeigt einen Angriff für sich)
+//                mega=1       die letzte Gruppe nimmt zwei weitere Zutaten auf und wird zur Megawaffe;
+//                anim=megafuse  dasselbe als Animation `animAt` Sekunden vor dem Einfrieren (live: nach 1,5 s)
+//                look=boss    Blick auf den ersten (Zwischen-)Boss nach dem Vorlauf;  look=core    Blick auf die letzte Super- bzw. Megawaffe;  fired=<s>  nach t weiter simulieren, bis sie feuert,
+//                             dann noch s Sekunden (für Bilder eines Angriffs);  night=1 mit world=1: Licht des Zukunfts-Zeitalters
+//                wave=<n>     erste Welle (fortlaufender Index), z. B. 4 für den Zwischenboss der Steinzeit, 14 für Rom
+//   debug=1      Kugeln an muzzleOf() und enemyCenter();  lines=0  ohne Schusslinien;  speed=<f>  Tempo im Live-Betrieb
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { registerModels } from '../src/content/models.js';
+import * as A from '../src/render/anim.js';
+import { createEffectLayer } from '../src/render/effects.js';
+import { createEntityLayer } from '../src/render/entities.js';
+import { createModel } from '../src/render/kit.js';
+import { CAMERA_AZIMUTH, CAMERA_ELEVATION, CAMERA_FOV, FLY_HEIGHT } from '../src/render/layout.js';
+import { LightRig, NEUTRAL_LIGHT, SkyDome, configureRenderer, createMaterials } from '../src/render/look.js';
+import { PostFx } from '../src/render/post.js';
+import { Terrain } from '../src/render/terrain.js';
+import { buildPath, samplePath, tileX, tileZ } from '../src/sim/path.js';
+import { towerStats } from '../src/sim/rules.js';
+
+const q = new URLSearchParams(location.search);
+const num = (name, fallback) => (q.get(name) !== null && q.get(name) !== '' ? Number(q.get(name)) : fallback);
+const SIM_DT = 1 / 60;
+
+// --- Testmodelle: ein Vogel (zeigt Schräglage und Blickrichtung) und eine Kanone (zeigt Neigung und Stufenteile) ------
+registerModels({
+  'enemy.dev.bird': () => {
+    const m = createModel('enemy.dev.bird');
+    const body = m.part('body', { pivot: [0, 0.16, 0] });
+    body.sphere({ r: 0.13, at: [0, 0.16, 0], scale: [0.85, 0.75, 1.5], color: '#6c7f9c', colorTop: '#93a7c4' });
+    body.sphere({ r: 0.08, at: [0, 0.22, 0.2], color: '#93a7c4' });
+    body.cone({ r: 0.035, h: 0.11, seg: 5, base: [0, 0.21, 0.26], rot: [Math.PI / 2, 0, 0], color: '#f0b040' });
+    body.box({ size: [0.14, 0.02, 0.16], at: [0, 0.17, -0.24], rot: [0.2, 0, 0], color: '#56677f' });
+    for (const side of [1, -1]) {
+      const wing = m.part(side > 0 ? 'wingL' : 'wingR', { pivot: [0.09 * side, 0.2, 0], parent: 'body' });
+      wing.box({ size: [0.34, 0.025, 0.2], at: [0.26 * side, 0.2, 0], color: '#56677f', colorTop: '#7d90ad' });
+    }
+    return m.build({
+      animate(pose, ctx) {
+        const flap = Math.sin(ctx.t * 9 + ctx.seed * 6.28) * 0.55;
+        pose.wingL.rotation.z = flap;
+        pose.wingR.rotation.z = -flap;
+        A.flinch(pose, ctx, 'body');
+      },
+    });
+  },
+  'tower.dev.cannon': () => {
+    const m = createModel('tower.dev.cannon');
+    const base = m.part('base');
+    base.cyl({ r: 0.38, rTop: 0.32, h: 0.34, seg: 8, base: [0, 0, 0], color: '#9a9288', colorTop: '#b9b1a4', faceJitter: 0.05 });
+    base.cyl({ r: 0.34, h: 0.05, seg: 8, base: [0, 0.34, 0], color: '#7a5233' });
+    const turret = m.part('turret', { pivot: [0, 0.39, 0] });
+    turret.box({ size: [0.3, 0.2, 0.34], base: [0, 0.39, 0], color: '#b8472f', colorTop: '#d4603f' });
+    const barrel = m.part('barrel', { pivot: [0, 0.52, 0.05], parent: 'turret' });
+    barrel.cyl({ r: 0.07, rTop: 0.06, h: 0.46, seg: 8, base: [0, 0.52, 0.02], rot: [Math.PI / 2, 0, 0], color: '#4a4f58', colorTop: '#6a707a' });
+    const flashPart = m.part('flash', { pivot: [0, 0.52, 0.5], parent: 'barrel' });
+    flashPart.sphere({ r: 0.09, detail: 0, at: [0, 0.52, 0.52], color: '#ffd070', glow: 1.3 });
+    m.part('plate', { minLevel: 2, parent: 'turret', pivot: [0, 0.5, 0.18] }).box({ size: [0.42, 0.26, 0.04], at: [0, 0.52, 0.2], color: '#6a707a' });
+    const flag = m.part('flag', { minLevel: 3 });
+    flag.cyl({ r: 0.018, h: 0.7, seg: 5, base: [-0.28, 0.34, -0.24], color: '#7a5233' });
+    flag.box({ size: [0.02, 0.18, 0.22], at: [-0.28, 0.94, -0.12], color: '#e0a33a' });
+    m.point('muzzle', [0, 0.52, 0.5], 'barrel');
+    return m.build({
+      animate(pose, ctx) {
+        A.aim(pose, ctx, 'turret', 'barrel');
+        A.recoil(pose, ctx, 'barrel', 0.1);
+        A.flash(pose, ctx, 'flash', 0, 1.2);
+      },
+    });
+  },
+});
+
+// --- Inhalte der Testpartie ---------------------------------------------------------------------------------------------
+/** Grundwerte eines Turms; nur was abweicht, wird überschrieben. */
+const stats = (o) => ({ attack: 'projectile', damage: 20, cooldown: 0.9, range: 2.6, minRange: 0, projectileSpeed: 9, splash: 0, slow: 0, slowDuration: 0, dot: 0, dotDuration: 0, pierce: 0, chain: 0, chainRange: 0, zone: 0, ramp: 0, rampTime: 0, hitsAir: true, hitsGround: true, auraDamage: 0, auraRate: 0, auraRange: 0, ...o });
+const shot = { kind: 'none', color: '#ffffff', impact: 'none', sound: 'none' };
+const tier = (name, model) => ({ name, flavor: '', model, shot });
+const arch = (id, color, st, models) => ({ id, role: id, summary: '', color, icon: id, unlockWave: 0, cost: 50, stats: stats(st), tiers: models.map((m, i) => tier(`${id} ${i}`, m)) });
+const enemyDef = (id, model, o) => ({ id, age: 'dev', name: id, description: '', model, boss: false, flying: false, hp: 1, speed: 0.9, armor: 0, shield: 0, regen: 0, slowResist: 0, bounty: 1, lives: 1, color: '#886644', ...o });
+const content = {
+  ages: [{ id: 'a0', name: 'Erstes' }, { id: 'a1', name: 'Zweites' }, { id: 'a2', name: 'Drittes' }],
+  archetypes: [
+    arch('shooter', '#e0a33a', {}, ['example.slinger', 'tower.dev.cannon', 'tower.dev.cannon']),
+    arch('rapid', '#d9574a', { attack: 'hitscan', damage: 3.2, cooldown: 0.16, range: 2.1 }, ['tower.dev.rapid0', 'tower.dev.rapid1', 'tower.dev.rapid1']),
+    arch('frost', '#57b5e6', { damage: 4, cooldown: 1.3, range: 2.2, slow: 0.45, slowDuration: 2.4, hitsAir: false }, ['tower.dev.frost0', 'tower.dev.frost1', 'tower.dev.frost1']),
+    arch('fire', '#f07a3a', { damage: 3, cooldown: 1.6, range: 2.0, dot: 7, dotDuration: 3, hitsAir: false }, ['tower.dev.fire0', 'tower.dev.fire1', 'tower.dev.fire1']),
+    arch('support', '#b58ae0', { attack: 'none', damage: 0, range: 1.7, auraDamage: 0.2, auraRate: 0.15 }, ['tower.dev.support0', 'tower.dev.support1', 'tower.dev.support1']),
+  ],
+  enemies: {
+    club: enemyDef('club', 'example.clubman', {}),
+    runner: enemyDef('runner', 'enemy.dev.runner', { speed: 1.7, hp: 0.6, scale: 0.8 }),
+    brute: enemyDef('brute', 'example.clubman', { speed: 0.6, hp: 5, scale: 1.45 }),
+    bird: enemyDef('bird', 'enemy.dev.bird', { speed: 1.25, hp: 1.2, flying: true }),
+    guard: enemyDef('guard', 'enemy.dev.guard', { speed: 0.8, hp: 2, shield: 0.8 }),
+    boss: enemyDef('boss', 'boss.dev.giant', { speed: 0.45, hp: 45, shield: 0.25, boss: true, lives: 5 }),
+  },
+  waves: [[], [], []],
+  maps: [],
+  balance: { ageDamage: [1, 1.6, 2.5], levelDamage: [1, 1.5, 2.2], levelRange: [1, 1.1, 1.2] },
+};
+const map = { id: 'dev', name: 'Test', description: '', width: 18, height: 12, paths: [[[-1, 2], [5, 2], [5, 8], [10, 8], [10, 3], [14, 3], [14, 9], [18, 9]]], blocked: [], seed: 5 };
+
+// --- Die kleine Simulation ----------------------------------------------------------------------------------------------
+function createMockSim(opts) {
+  const paths = map.paths.map((p) => buildPath(p, map.width, map.height));
+  const airPaths = paths.map((p) => {
+    const n = p.xs.length - 1;
+    const length = Math.hypot(p.xs[n] - p.xs[0], p.zs[n] - p.zs[0]);
+    return { xs: new Float32Array([p.xs[0], p.xs[n]]), zs: new Float32Array([p.zs[0], p.zs[n]]), ds: new Float32Array([0, length]), length, tiles: [] };
+  });
+  const pathTiles = new Set(paths[0].tiles.map(([x, z]) => `${x},${z}`));
+  const state = { time: 0, tick: 0, phase: 'wave', gold: 500, lives: 20, maxLives: 20, score: 0, wave: 0, age: opts.age, waveInAge: 0, buildTime: 0, lock: 0, pending: 0, abilityCooldown: 0, enemies: [], towers: [], projectiles: [], zones: [], stats: {} };
+  let events = [];
+  let nextId = 1;
+  const pendingHits = [];
+  const sample = { x: 0, z: 0, dx: 0, dz: 1 };
+  const damageScale = opts.stress ? 0.12 : num("dmg", 0.3);
+
+  function place(e) {
+    const curve = e.def.flying ? airPaths[e.path] : paths[e.path];
+    samplePath(curve, e.dist, sample);
+    e.x = sample.x - sample.dz * e.lane;
+    e.z = sample.z + sample.dx * e.lane;
+    e.dx = sample.dx;
+    e.dz = sample.dz;
+    e.progress = e.dist / curve.length;
+  }
+  function spawn(defId, dist = 0, age = 0) {
+    const def = content.enemies[defId];
+    const maxHp = 100 * def.hp;
+    const id = nextId++;
+    const e = { id, def, hp: maxHp, maxHp, shield: maxHp * def.shield, maxShield: maxHp * def.shield, armor: 0, path: 0, dist, progress: 0, lane: ((id * 0.618) % 1 - 0.5) * 0.5, x: 0, z: 0, px: 0, pz: 0, dx: 0, dz: 1, speed: def.speed, slow: 0, slowTime: 0, dot: 0, dotTime: 0, sinceHit: Infinity, age, bounty: 1, phase: 0, boost: 1, boostTime: 0, alive: true, hurt: 0, hurtShield: false };
+    place(e);
+    e.px = e.x;
+    e.pz = e.z;
+    state.enemies.push(e);
+    events.push({ type: 'spawn', enemy: e });
+    return e;
+  }
+  function addTower(archId, tierIndex, level, tx, tz, silent = false) {
+    const a = content.archetypes.find((x) => x.id === archId);
+    const x = tileX(tx, map.width);
+    const z = tileZ(tz, map.height);
+    const t = { id: nextId++, arch: a, tier: tierIndex, level, tx, tz, x, z, stats: towerStats(content, a, tierIndex, level), buffDamage: 0, buffRate: 0, buffRange: 0, mode: 'first', cooldown: 0, targetId: -1, aimX: x, aimZ: z + 1, aimFlying: false, lastShot: -Infinity, beamTime: 0, invested: 50, kills: 0, damageDealt: 0, builtWave: 0 };
+    state.towers.push(t);
+    if (!silent) events.push({ type: 'build', tower: t });
+    return t;
+  }
+  function hurt(e, amount, src, direct) {
+    if (!e.alive) return;
+    let rest = amount * damageScale;
+    if (e.shield > 0) {
+      const absorbed = Math.min(e.shield, rest);
+      e.shield -= absorbed;
+      rest -= absorbed;
+      e.hurtShield = true;
+    }
+    e.hp -= Math.min(e.hp, rest);
+    e.hurt += amount;
+    if (direct) {
+      e.sinceHit = 0;
+      if (src && src.slow > 0 && !e.def.flying) { e.slow = src.slow; e.slowTime = src.slowDuration; }
+      if (src && src.dot > 0) { e.dot = src.dot; e.dotTime = src.dotDuration; }
+    }
+    if (e.hp <= 0) e.alive = false;
+  }
+
+  const pattern = ['club', 'club', 'runner', 'guard', 'club', 'bird', 'brute', 'club', 'runner', 'guard', 'bird', 'club'];
+  let spawnIndex = 0;
+  let spawnTimer = 0;
+  let bossDone = false;
+
+  function step() {
+    state.time += SIM_DT;
+    state.tick++;
+    // Nachschub
+    if (opts.stress) {
+      while (state.enemies.length < opts.stress) spawn(pattern[spawnIndex++ % pattern.length]);
+    } else {
+      spawnTimer -= SIM_DT;
+      if (spawnTimer <= 0) {
+        spawn(pattern[spawnIndex++ % pattern.length]);
+        spawnTimer = 0.75;
+      }
+      if (!bossDone && state.time > 3) { bossDone = true; spawn('boss'); }
+    }
+    // Gegner
+    for (const e of state.enemies) {
+      e.px = e.x;
+      e.pz = e.z;
+      e.age += SIM_DT;
+      e.sinceHit += SIM_DT;
+      if (e.slowTime > 0) { e.slowTime -= SIM_DT; if (e.slowTime <= 0) e.slow = 0; }
+      if (e.dotTime > 0) {
+        e.dotTime -= SIM_DT;
+        hurt(e, e.dot * SIM_DT, null, false);
+        if (e.dotTime <= 0) e.dot = 0;
+      }
+      if (e.shield < e.maxShield && e.sinceHit > 2.5) e.shield = Math.min(e.maxShield, e.shield + (e.maxShield * SIM_DT) / 3);
+      e.speed = e.def.speed * (1 - e.slow);
+      e.dist += e.speed * SIM_DT;
+      place(e);
+      if (e.progress >= 1) { e.alive = false; e.leaked = true; }
+    }
+    // Auren
+    for (const t of state.towers) { t.buffDamage = 0; t.buffRate = 0; t.buffRange = 0; }
+    for (const s of state.towers) {
+      if (s.stats.auraDamage <= 0 && s.stats.auraRate <= 0) continue;
+      for (const t of state.towers) {
+        if (t === s || t.stats.attack === 'none') continue;
+        if (Math.hypot(t.x - s.x, t.z - s.z) <= s.stats.range) { t.buffDamage = s.stats.auraDamage; t.buffRate = s.stats.auraRate; }
+      }
+    }
+    // Türme
+    for (const t of state.towers) {
+      const s = t.stats;
+      if (s.attack === 'none') continue;
+      t.cooldown = Math.max(0, t.cooldown - SIM_DT);
+      let best = null;
+      for (const e of state.enemies) {
+        if (!e.alive || e.age < 0.3) continue;
+        if (e.def.flying ? !s.hitsAir : !s.hitsGround) continue;
+        if (Math.hypot(e.x - t.x, e.z - t.z) > s.range) continue;
+        if (!best || e.progress > best.progress) best = e;
+      }
+      t.targetId = best ? best.id : -1;
+      if (!best) continue;
+      t.aimX = best.x;
+      t.aimZ = best.z;
+      t.aimFlying = best.def.flying;
+      if (t.cooldown > 0) continue;
+      t.cooldown = s.cooldown / (1 + t.buffRate);
+      t.lastShot = state.time;
+      events.push({ type: 'shot', tower: t, targetId: best.id, x: best.x, z: best.z, flying: best.def.flying });
+      const delay = s.attack === 'projectile' ? Math.hypot(best.x - t.x, best.z - t.z) / s.projectileSpeed : 0;
+      pendingHits.push({ at: state.time + delay, enemy: best, stats: s, damage: s.damage * (1 + t.buffDamage) });
+    }
+    for (let i = pendingHits.length - 1; i >= 0; i--) {
+      const h = pendingHits[i];
+      if (h.at > state.time) continue;
+      pendingHits.splice(i, 1);
+      hurt(h.enemy, h.damage, h.stats, true);
+    }
+    // Aufräumen
+    let kept = 0;
+    for (const e of state.enemies) {
+      if (e.hurt > 0) {
+        events.push({ type: 'damage', enemy: e, amount: e.hurt, shield: e.hurtShield });
+        e.hurt = 0;
+        e.hurtShield = false;
+      }
+      if (e.alive) state.enemies[kept++] = e;
+      else if (e.leaked) events.push({ type: 'leak', enemy: e, lives: state.lives });
+      else events.push({ type: 'kill', enemy: e, bounty: 1, towerId: -1 });
+    }
+    state.enemies.length = kept;
+  }
+
+  const sim = {
+    content, map, paths, airPaths, state, totalWaves: 1, config: { content, mapId: 'dev', difficulty: 'normal', seed: 1 },
+    step,
+    drainEvents() { const out = events; events = []; return out; },
+    towerById: (id) => state.towers.find((t) => t.id === id) ?? null,
+    enemyById: (id) => state.enemies.find((e) => e.id === id) ?? null,
+    towerAt: (tx, tz) => state.towers.find((t) => t.tx === tx && t.tz === tz) ?? null,
+    build(archId, tx, tz) { addTower(archId, state.age, 1, tx, tz); return { ok: true }; },
+    upgrade(id) { const t = sim.towerById(id); t.level = Math.min(3, t.level + 1); t.stats = towerStats(content, t.arch, t.tier, t.level); events.push({ type: 'upgrade', tower: t }); return { ok: true }; },
+    modernize(id) { const t = sim.towerById(id); const fromTier = t.tier; t.tier = state.age; t.stats = towerStats(content, t.arch, t.tier, t.level); events.push({ type: 'modernize', tower: t, fromTier }); return { ok: true }; },
+    sell(id) { const t = sim.towerById(id); state.towers.splice(state.towers.indexOf(t), 1); events.push({ type: 'sell', tower: t, refund: 0 }); return { ok: true }; },
+    canBuild: (tx, tz) => ({ ok: !pathTiles.has(`${tx},${tz}`) && !sim.towerAt(tx, tz) }),
+    // Wege, die sich wandeln: Die Testkarte hat nur die Grundwege (Stufe 0).
+    pathStages: [0],
+    pathStage: () => 0,
+    stagePaths: (stage) => (Number.isInteger(stage) && stage >= 0 ? paths : []),
+    stageAirPaths: (stage) => (Number.isInteger(stage) && stage >= 0 ? airPaths : []),
+    pathMark: (tx, tz) => (pathTiles.has(`${tx},${tz}`) ? 'path' : ''),
+    tileAt: () => '',
+  };
+
+  // Aufstellung
+  if (opts.stress) {
+    // 80 Türme auf den freien Feldern, die dem Weg am nächsten liegen; Gegner gleichmäßig über den Weg verteilt.
+    const free = [];
+    for (let tz = 0; tz < map.height; tz++) for (let tx = 0; tx < map.width; tx++) {
+      if (pathTiles.has(`${tx},${tz}`)) continue;
+      let d = 99;
+      for (const [px, pz] of paths[0].tiles) d = Math.min(d, Math.abs(px - tx) + Math.abs(pz - tz));
+      free.push({ tx, tz, d: d + ((tx * 7 + tz * 13) % 5) * 0.01 });
+    }
+    free.sort((a, b) => a.d - b.d);
+    const kinds = ['shooter', 'rapid', 'frost', 'shooter', 'fire', 'rapid', 'support', 'shooter'];
+    for (let i = 0; i < 80 && i < free.length; i++) addTower(kinds[i % kinds.length], i % 2, 1 + (i % 3), free[i].tx, free[i].tz, true);
+    for (let i = 0; i < opts.stress; i++) {
+      const e = spawn(pattern[spawnIndex++ % pattern.length], 0, 1);
+      e.dist = ((i + 0.5) / opts.stress) * (e.def.flying ? airPaths[0].length : paths[0].length);
+      place(e);
+      e.px = e.x;
+      e.pz = e.z;
+    }
+    events = [];
+  } else {
+    const setup = [
+      ['shooter', 0, 1, 2, 3], ['rapid', 1, 2, 4, 1], ['shooter', 1, 3, 6, 4], ['frost', 1, 1, 4, 6], ['fire', 1, 2, 7, 7],
+      ['shooter', 1, 3, 8, 9], ['support', 1, 1, 9, 5], ['shooter', 0, 2, 9, 6], ['rapid', 1, 1, 11, 5], ['shooter', 0, 3, 12, 4],
+      ['shooter', 1, 1, 13, 2], ['frost', 0, 3, 13, 7], ['shooter', 1, 2, 15, 5], ['rapid', 0, 2, 15, 8], ['fire', 1, 1, 6, 9],
+    ];
+    for (const [a, tierIndex, level, tx, tz] of setup) addTower(a, tierIndex, level, tx, tz, true);
+  }
+  return sim;
+}
+
+// --- Die echte Simulation mit den echten Inhalten ------------------------------------------------------------------------
+// Baut Türme aller Rollen auf die freien Felder am Weg (mit geschenktem Gold), baut einige aus und startet die Wellen von selbst.
+async function createRealSim() {
+  const [{ content: realContent }, simModule] = await Promise.all([import('../src/content/index.js'), import('../src/sim/sim.js')]);
+  const s = simModule.createSim({ content: realContent, mapId: q.get('map') ?? realContent.maps[0].id, difficulty: 'normal', seed: num('seed', 7), unlockAll: true });
+  s.state.gold = 1e7;
+  if (superCount > 0) return buildSuperShow(s, realContent);
+  const tiles = s.paths.flatMap((p) => p.tiles);
+  const free = [];
+  for (let tz = 0; tz < s.map.height; tz++) for (let tx = 0; tx < s.map.width; tx++) {
+    if (!s.canBuild(tx, tz).ok) continue;
+    let d = 99;
+    for (const [px, pz] of tiles) d = Math.min(d, Math.abs(px - tx) + Math.abs(pz - tz));
+    free.push({ tx, tz, d: d + ((tx * 7 + tz * 13) % 7) * 0.1 });
+  }
+  free.sort((a, b) => a.d - b.d);
+  const wanted = stress ? 80 : num('towers', 16);
+  const step = stress ? 1 : Math.max(1, Math.floor(free.length / 3 / wanted));
+  let built = 0;
+  for (let i = 0; i < free.length && built < wanted; i += step) {
+    const a = realContent.archetypes[built % realContent.archetypes.length];
+    if (!s.build(a.id, free[i].tx, free[i].tz).ok) continue;
+    const tower = s.towerAt(free[i].tx, free[i].tz);
+    for (let l = 0; l < built % 3; l++) s.upgrade(tower.id);
+    built++;
+  }
+  s.drainEvents();
+  return s;
+}
+
+// Superwaffen-Schau: Dreiergruppen (Kern und zwei Nachbarn, alle Stufe 3) nahe am Weg; die ersten `superCount` werden sofort
+// verschmolzen, die übrigen warten auf anim=fuse. Dazu vier gewöhnliche Türme der Stufe 3 (beide Zweige) zum Vergleich.
+/** @type {{ core: number, parts: number[] }[]} */
+const pendingFusions = [];
+function buildSuperShow(s, realContent) {
+  s.state.age = Math.min(realContent.ages.length - 1, num('age', 0));
+  const tiles = s.paths.flatMap((p) => p.tiles);
+  const free = [];
+  for (let tz = 0; tz < s.map.height; tz++) for (let tx = 0; tx < s.map.width; tx++) {
+    if (!s.canBuild(tx, tz).ok) continue;
+    let d = 99;
+    for (const [px, pz] of tiles) d = Math.min(d, Math.abs(px - tx) + Math.abs(pz - tz));
+    free.push({ tx, tz, d: d + Math.hypot(tx - s.map.width / 2, tz - s.map.height / 2) * 0.15 });
+  }
+  free.sort((a, b) => a.d - b.d);
+  const used = new Set();
+  const key = (x, z) => `${x},${z}`;
+  const isFree = (x, z) => !used.has(key(x, z)) && s.canBuild(x, z).ok;
+  const archs = realContent.archetypes.filter((a) => a.fusion && a.tiers[s.state.age]);
+  const coreIds = q.get('cores') ? q.get('cores').split(',') : null;
+  const coreArch = (g) => (coreIds ? realContent.archetypes.find((a) => a.id === coreIds[g % coreIds.length]) : archs[g % archs.length]);
+  if (q.get('wave')) s.state.wave = num('wave', 0);
+  const make = (a, tx, tz, branch) => {
+    if (!s.build(a.id, tx, tz).ok) throw new Error(`Bau gescheitert: ${a.id} ${tx},${tz}`);
+    const t = s.towerAt(tx, tz);
+    s.upgrade(t.id);
+    s.upgrade(t.id, branch);
+    return t;
+  };
+  const groups = superCount + (animKind === 'fuse' ? Math.max(1, num('extra', 1)) : 0);
+  let g = 0;
+  for (const c of free) {
+    if (g >= groups) break;
+    if (!isFree(c.tx, c.tz)) continue;
+    const around = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dz]) => [c.tx + dx, c.tz + dz]).filter(([x, z]) => isFree(x, z));
+    if (around.length < 2) continue;
+    const core = make(coreArch(g), c.tx, c.tz, g % 2);
+    const parts = [0, 1].map((k) => make(archs[(g * 2 + k + 1) % archs.length], around[k][0], around[k][1], k).id);
+    // Abstand halten, damit die Gruppen nicht ineinander stehen.
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) used.add(key(c.tx + dx, c.tz + dz));
+    if (g < superCount) {
+      const r = s.fuse(core.id, parts);
+      if (!r.ok) throw new Error(`Verschmelzung gescheitert: ${JSON.stringify(r)}`);
+      // Megawaffe: die letzte Gruppe nimmt zwei weitere Nachbarn auf (sofort oder als Animation).
+      const wantMega = (q.get('mega') === '1' || animKind === 'megafuse') && g === superCount - 1;
+      if (wantMega) {
+        const more = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dz]) => [c.tx + dx, c.tz + dz]).filter(([x, z]) => s.canBuild(x, z).ok).slice(0, 2);
+        if (more.length < 2) throw new Error('Kein Platz für die Megawaffe');
+        const megaParts = more.map(([x, z], k) => make(archs[(g * 2 + k + 3) % archs.length], x, z, (k + 1) % 2).id);
+        if (animKind === 'megafuse') pendingFusions.push({ core: core.id, parts: megaParts });
+        else {
+          const m = s.fuse(core.id, megaParts);
+          if (!m.ok) throw new Error(`Megawaffe gescheitert: ${JSON.stringify(m)}`);
+        }
+      }
+    } else pendingFusions.push({ core: core.id, parts });
+    g++;
+  }
+  let extra = 0;
+  for (const c of free) {
+    if (extra >= 4) break;
+    if (!isFree(c.tx, c.tz)) continue;
+    make(archs[extra % archs.length], c.tx, c.tz, extra % 2);
+    used.add(key(c.tx, c.tz));
+    extra++;
+  }
+  // plain=1: dieselbe Szene ohne die Darstellung der Superwaffen (Vergleichsmessung).
+  if (q.get('plain') === '1') for (const t of s.state.towers) t.super = false;
+  s.drainEvents();
+  return s;
+}
+
+// --- Bühne ----------------------------------------------------------------------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+configureRenderer(renderer);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const superCount = num('super', 0);
+const animKind = q.get('anim');
+const useWorld = superCount > 0 && q.get('world') === '1';
+const theme = { ...NEUTRAL_LIGHT };
+const rig = useWorld ? null : new LightRig(scene, { radius: 16 });
+const sky = useWorld ? null : new SkyDome();
+if (rig && sky) {
+  rig.apply(theme);
+  sky.apply(theme);
+  scene.add(sky.mesh);
+  scene.fog = new THREE.FogExp2(new THREE.Color(theme.fogColor).getHex(), 0.004);
+}
+if (q.get('night') && rig && sky) {
+  rig.apply({ ...theme, sunColor: '#9db8ff', sunIntensity: 0.7, hemiSky: '#5f76b8', hemiGround: '#2b3350', hemiIntensity: 0.75, fillIntensity: 0.2 });
+  sky.apply({ ...theme, skyTop: '#0b1026', skyHorizon: '#27345e', skyBottom: '#101632', sunColor: '#c7d6ff', sunGlow: 0.6 });
+  scene.fog.color.set('#27345e');
+}
+const materials = createMaterials();
+const stress = num('count', 0);
+const real = q.get('sim') === 'real' || superCount > 0;
+const sim = real ? await createRealSim() : createMockSim({ age: num('age', 1), stress });
+const pathSet = new Set(sim.paths.flatMap((p) => p.tiles.map(([x, z]) => `${x},${z}`)));
+const lastTile = sim.paths[0].tiles[sim.paths[0].tiles.length - 1];
+const terrain = useWorld ? null : new Terrain({ width: sim.map.width, height: sim.map.height, isPath: (x, z) => pathSet.has(`${x},${z}`), isSolid: (x, z) => Math.abs(x - lastTile[0]) <= 1.5 && Math.abs(z - lastTile[1]) <= 1, seed: 5 }, materials.matte);
+if (terrain) {
+  terrain.setPalette({ groundA: '#8cc56a', groundB: '#74b45c', path: '#d9c08f', pathEdge: '#b89a68', soil: '#9a6e45', rock: '#8a8f98' });
+  terrain.mesh.receiveShadow = true;
+  scene.add(terrain.mesh);
+}
+
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV, innerWidth / innerHeight, 1, 600);
+const az = (num('az', CAMERA_AZIMUTH) * Math.PI) / 180;
+const el = (num('el', CAMERA_ELEVATION) * Math.PI) / 180;
+const dist = num('dist', 30);
+const coreTower = sim.state.towers.filter((t) => t.super).at(-1);
+const look = q.get('look') === 'core' && coreTower ? [coreTower.x, coreTower.z] : (q.get('look') ?? '0,0.5').split(',').map(Number);
+camera.position.set(look[0] + Math.sin(az) * Math.cos(el) * dist, Math.sin(el) * dist, look[1] + Math.cos(az) * Math.cos(el) * dist);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(look[0], 0, look[1]);
+controls.update();
+camera.updateMatrixWorld();
+const post = q.get('post') || useWorld ? new PostFx(renderer, scene, camera) : null;
+// Echte Welt des Zeitalters (nur in der Superwaffen-Schau): Insel, Licht und Belichtung wie im Spiel.
+let world = null;
+if (useWorld) {
+  const { createWorld } = await import('../src/render/world.js');
+  world = createWorld({ scene, camera, renderer, materials, content: sim.content });
+  if (q.get('quality')) world.setQuality(q.get('quality'));
+  world.build(sim.map, sim.state.age);
+  for (const t of sim.state.towers) world.setTileOccupied(t.tx, t.tz, true);
+}
+// Mit Nachbearbeitung zeichnet der Renderer mehrere Durchgänge je Bild; gezählt wird über das ganze Bild.
+renderer.info.autoReset = false;
+
+const layer = createEntityLayer({ scene, camera, renderer, materials, content: sim.content });
+layer.bind(sim);
+if (q.get('quality')) layer.setQuality(q.get('quality'));
+// Effektschicht (nur in der Superwaffen-Schau), damit die Verschmelzung als Ganzes zu sehen ist.
+const effects = superCount > 0 && q.get('fx') !== '0'
+  ? createEffectLayer({ scene, camera, renderer, materials, content: sim.content }, layer, world ?? { base: { x: 0, z: 0 }, entrances: [], hitBase() {} })
+  : null;
+if (effects) {
+  effects.bind(sim);
+  if (q.get('quality')) effects.setQuality(q.get('quality'));
+}
+
+// Schusslinien und Prüfkugeln der Testseite (nicht Teil der Figurenschicht).
+const showLines = q.get('lines') !== '0' && !effects;
+const MAX_LINES = 256;
+const linePos = new Float32Array(MAX_LINES * 6);
+const lineGeo = new THREE.BufferGeometry();
+lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+const lines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ color: '#fff6c8', transparent: true, opacity: 0.85 }));
+lines.frustumCulled = false;
+scene.add(lines);
+const shots = [];
+const v0 = new THREE.Vector3();
+const v1 = new THREE.Vector3();
+const debug = q.get('debug') ? new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.045, 1), new THREE.MeshBasicMaterial({ color: '#ff3df2', depthTest: false }), 600) : null;
+if (debug) { debug.frustumCulled = false; debug.renderOrder = 50; scene.add(debug); }
+const dm = new THREE.Matrix4();
+
+function drawDebug() {
+  let n = 0;
+  for (let i = shots.length - 1; i >= 0; i--) {
+    const s = shots[i];
+    if (sim.state.time - s.time > 0.09 || n >= MAX_LINES) { shots.splice(i, 1); continue; }
+    linePos.set([s.from.x, s.from.y, s.from.z, s.to.x, s.to.y, s.to.z], n * 6);
+    n++;
+  }
+  lineGeo.setDrawRange(0, n * 2);
+  lineGeo.attributes.position.needsUpdate = true;
+  if (debug) {
+    let k = 0;
+    for (const t of sim.state.towers) { layer.muzzleOf(t, v0); debug.setMatrixAt(k++, dm.makeTranslation(v0.x, v0.y, v0.z)); }
+    for (const e of sim.state.enemies) { if (k >= 600) break; layer.enemyCenter(e, v0); debug.setMatrixAt(k++, dm.makeTranslation(v0.x, v0.y, v0.z)); }
+    debug.count = k;
+    debug.instanceMatrix.needsUpdate = true;
+  }
+}
+
+// Schritt der Testpartie: Simulation, Ereignisse, Figurenschicht. Die Schusslinie beginnt an der Mündung der NACH dem
+// Ereignis gezeichneten Pose, so wie es die Effektschicht im Spiel sieht.
+const pendingShots = [];
+let updateSum = 0;
+let updateCount = 0;
+let updateMax = 0;
+function timedUpdate(dt, simDt, alpha) {
+  const a = performance.now();
+  layer.update(dt, simDt, alpha);
+  if (effects) effects.update(dt, simDt, alpha);
+  const ms = performance.now() - a;
+  updateSum += ms;
+  updateCount++;
+  if (updateCount > 30 && ms > updateMax) updateMax = ms;
+  for (const ev of pendingShots) {
+    const from = new THREE.Vector3();
+    layer.muzzleOf(ev.tower, from);
+    const target = sim.enemyById(ev.targetId);
+    const to = target ? layer.enemyCenter(target, new THREE.Vector3()) : new THREE.Vector3(ev.x, ev.flying ? FLY_HEIGHT : 0.2, ev.z);
+    shots.push({ time: sim.state.time, from, to });
+  }
+  pendingShots.length = 0;
+}
+function stepSim() {
+  if (real) {
+    // Wellen von selbst starten, Gold nachfüllen, nach einem Zeitalterwechsel jeden zweiten Turm modernisieren.
+    if (q.get('waves') !== '0' && sim.state.phase === 'build' && sim.state.lock <= 0) sim.startWave();
+    sim.state.gold = 1e7;
+    if (stress && sim.state.tick % 30 === 0) sim.state.lives = sim.state.maxLives;
+  }
+  sim.step();
+  let events = sim.drainEvents();
+  if (real && events.some((ev) => ev.type === 'age')) {
+    sim.state.towers.forEach((t, i) => { if (i % 2 === 0) sim.modernize(t.id); });
+    events = events.concat(sim.drainEvents());
+  }
+  layer.handleEvents(events);
+  if (effects) effects.handleEvents(events);
+  if (showLines) for (const ev of events) if (ev.type === 'shot') pendingShots.push(ev);
+}
+
+// Auslöser für die Animationen eines Turms.
+const animAt = num('animAt', 0.15);
+let animDone = false;
+function triggerAnim() {
+  animDone = true;
+  const tower = sim.towerAt(6, 4) ?? sim.state.towers[0];
+  const other = sim.towerAt(9, 6) ?? sim.state.towers[1];
+  if (animKind === 'build') sim.build(sim.content.archetypes[0].id, 7, 5);
+  else if (animKind === 'upgrade') sim.upgrade(other.id);
+  else if (animKind === 'modernize') sim.modernize(other.id);
+  else if (animKind === 'sell') sim.sell(tower.id);
+  else if (animKind === 'fuse' || animKind === 'megafuse') {
+    const group = pendingFusions.shift();
+    if (group) sim.fuse(group.core, group.parts);
+  }
+  const events = sim.drainEvents();
+  layer.handleEvents(events);
+  if (effects) effects.handleEvents(events);
+}
+
+function applyInteraction() {
+  const p = q.get('preview');
+  const ids = sim.content.archetypes.map((a) => a.id);
+  if (p === '1') layer.setBuildPreview({ archId: ids[0], tx: 7, tz: 5, valid: true });
+  if (p === '2') layer.setBuildPreview({ archId: ids[1], tx: 8, tz: 8, valid: false });
+  if (q.get('select')) layer.setSelectedTower(sim.towerAt(6, 4) ?? sim.state.towers[0]);
+  if (q.get('ability')) layer.setAbilityCursor({ x: -3.5, z: 2.5, radius: num('radius', 1.8) });
+}
+
+const freezeAt = q.get('t') !== null ? Number(q.get('t')) : -1;
+if (freezeAt >= 0) {
+  // Vorlauf mit festem Takt: Jeder Zeitschritt ist ein Bild der Figurenschicht, damit geglättete Größen stimmen.
+  applyInteraction();
+  const steps = Math.round(freezeAt / SIM_DT);
+  for (let i = 0; i < steps; i++) {
+    if (animKind && !animDone && sim.state.time >= freezeAt - animAt - 1e-6) triggerAnim();
+    stepSim();
+    timedUpdate(SIM_DT, SIM_DT, 1);
+  }
+  // fired=<s>: weiter, bis die gezeigte Superwaffe feuert, dann noch s Sekunden.
+  if (q.get('fired') !== null && coreTower) {
+    const before = coreTower.lastShot;
+    for (let i = 0; i < 1200 && coreTower.lastShot === before; i++) { stepSim(); timedUpdate(SIM_DT, SIM_DT, 1); }
+    const extra = Math.round(num('fired', 0) / SIM_DT);
+    for (let i = 0; i < extra; i++) { stepSim(); timedUpdate(SIM_DT, SIM_DT, 1); }
+  }
+}
+applyInteraction();
+// look=boss: nach dem Vorlauf auf den ersten Boss bzw. Zwischenboss blicken (Größe, Füße, Balken, Schatten prüfen).
+if (q.get('look') === 'boss') {
+  const boss = sim.state.enemies.find((e) => e.def.boss);
+  if (boss) {
+    camera.position.set(boss.x + Math.sin(az) * Math.cos(el) * dist, Math.sin(el) * dist, boss.z + Math.cos(az) * Math.cos(el) * dist);
+    controls.target.set(boss.x, 0, boss.z);
+    controls.update();
+  }
+}
+
+const hud = document.getElementById('hud');
+const speed = num('speed', 1);
+let frames = 0;
+let frameSum = 0;
+let frameCount = 0;
+let bank = 0;
+let last = performance.now();
+let fuseClock = last;
+function loop() {
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (freezeAt >= 0) {
+    timedUpdate(0, 0, 1);
+  } else {
+    if ((animKind === 'fuse' || animKind === 'megafuse') && pendingFusions.length > 0 && now - fuseClock > (animDone ? 5000 : 1500)) { fuseClock = now; triggerAnim(); }
+    bank += dt * speed;
+    let n = 0;
+    while (bank >= SIM_DT && n < 12) { stepSim(); bank -= SIM_DT; n++; }
+    timedUpdate(dt, n * SIM_DT, Math.min(1, bank / SIM_DT));
+  }
+  drawDebug();
+  controls.update();
+  renderer.info.reset();
+  if (world) {
+    world.update(dt);
+    renderer.toneMappingExposure = world.exposure;
+    if (post) post.setBloom(world.bloom);
+  }
+  if (post) post.render(); else renderer.render(scene, camera);
+  frames++;
+  if (frames > 10) { frameSum += dt * 1000; frameCount++; }
+  window.__info = {
+    calls: renderer.info.render.calls,
+    triangles: renderer.info.render.triangles,
+    updateMs: Number((updateSum / Math.max(1, updateCount)).toFixed(3)),
+    updateMsMax: Number(updateMax.toFixed(2)),
+    updates: updateCount,
+    frameMs: Number((frameSum / Math.max(1, frameCount)).toFixed(2)),
+    enemies: sim.state.enemies.length,
+    towers: sim.state.towers.length,
+    simTime: Number(sim.state.time.toFixed(2)),
+  };
+  if (frames % 20 === 0) hud.textContent = `Gegner ${sim.state.enemies.length} · Türme ${sim.state.towers.length} · Aufrufe ${renderer.info.render.calls} · Dreiecke ${renderer.info.render.triangles} · update ${window.__info.updateMs} ms`;
+  if (frames === 3) window.__ready = true;
+  requestAnimationFrame(loop);
+}
+addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+});
+window.__layer = layer;
+window.__sim = sim;
+loop();
+</script>
+</body>
+</html>
